@@ -14,9 +14,9 @@
       "launchBrowser": true,
       "launchUrl": "swagger",
       "environmentVariables": {
-        "MOCKCENTOPS__CHATBOTS__0__ID": "bot1",
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "MOCKCENTOPS__CHATBOTS__0__ENDPOINT": "http:/bot1/dmr-api/dmr-response"
+        "DMRSERVICESETTINGS__CENTOPSURI": "http://centops",
+        "DMRSERVICESETTINGS__CENTOPSAPIKEY": "<PARTICIPANT KEY CREATED BY CENTOPS ADMIN>"
       },
       "applicationUrl": "https://localhost:7155;http://localhost:5155",
       "dotnetRunMessages": true
