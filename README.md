@@ -31,12 +31,8 @@ graph TD
     B1 <--> B2
   end
 
-  A1 -- WebSocket --> S
-  S -- WebSocket --> A1
-
-  B1 -- WebSocket --> S
-  S -- WebSocket --> B1
-
+  A1 <--> S
+  B1 <--> S
   S <--> MQ
   CO -->|configuration| S
 
