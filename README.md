@@ -45,14 +45,14 @@ graph TD
 ### DMR agents
 
 - **DMR agents** run in every client's Bürokratt cluster. They are responsible for forwarding messages to the DMR Server and receiving messages from it in real-time. This is done via a WebSocket connection.
-- TODO NOT YET READY
+<!-- TODO NOT YET READY -->
 
 ### DMR server
 
 - Key functionality is to forward the messages between DMR agents using RabbitMQ.
 - Uses WebSockets to exchange messages with DMR agents.
-- Gets its configuration from CentOps. CentOps is developed separately and is out of scope for this project.
-- Can also distribute configuration to DMR agents if necessary, namely public keys.
+- Gets its configuration from CentOps. CentOps is developed separately and is **out of scope for this project**.
+- Can also distribute configuration to DMR agents if necessary, namely a list of other DMR agents and their public keys.
 - DMR server _itself_ is lightweight and stateless, it does not store any messages or configuration data in any sort of a DB.
 - **Cannot** read the message contents, these are encrypted by the DMR agents.
 - There can be several instances of DMR server running, depending on load.
@@ -60,7 +60,7 @@ graph TD
 
 ### RabbitMQ
 
-- Has per-Agent message queues. To do: or not?
+- Has per-Agent message queues.
 - Has a dead letter queue for messages that failed to deliver.
 - Has RabbitMQ UI-based monitoring tools set up.
 - Supports RabbitMQ clustering for scalability.
