@@ -4,7 +4,6 @@ import * as rabbit from 'amqplib';
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit {
-  private readonly dlqName: string = 'MAIN_DEAD_LETTERS_QUEUE';
   private readonly logger = new Logger(RabbitMQService.name);
 
   constructor() {}
@@ -22,12 +21,14 @@ export class RabbitMQService implements OnModuleInit {
     });
 
     this.channel = await this.client.createChannel();
-    this.logger.log('Rabbit connected');
+    this.logger.log('RabbitMQ connected');
   }
 
-  async setupQueue(queueName: string, ttl: number = 30000, dlqName?: string): Promise<void> {
+  async setupQueue(queueName: string, ttl: number = 30000): Promise<void> {
+    const dlqName = `${queueName}_dlq`;
+
     // Create DLQ for our queue
-    await this.channel.assertQueue(dlqName ?? this.dlqName, { durable: true });
+    await this.channel.assertQueue(dlqName, { durable: true });
 
     // Create and setup our queue
     await this.channel.assertQueue(queueName, {
@@ -35,10 +36,10 @@ export class RabbitMQService implements OnModuleInit {
       arguments: {
         'x-message-ttl': ttl, // 30 seconds
         'x-dead-letter-exchange': '', // use default exchange
-        'x-dead-letter-routing-key': dlqName ?? this.dlqName,
+        'x-dead-letter-routing-key': dlqName,
       },
     });
 
-    console.log(`Queue ${queueName} with TTL ${ttl}ms and DLQ ${dlqName ?? this.dlqName} set up.`);
+    console.log(`Queue ${queueName} with TTL ${ttl}ms and DLQ ${dlqName} set up.`);
   }
 }
