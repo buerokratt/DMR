@@ -11,9 +11,11 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
 
   await app.listen(process.env.PORT ?? 5000);
+
   if (process.env.NODE_ENV === 'development') {
     const logger = new Logger('bootstrap');
     logger.log(`Listening on ${await app.getUrl()}`);
   }
 }
+
 bootstrap();
