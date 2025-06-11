@@ -1,15 +1,16 @@
+import { HttpService } from '@nestjs/axios';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CENT_OPS_CONFIG_TOKEN, CentOpsConfig } from '../../common/config/app.config';
-import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
-import { plainToInstance } from 'class-transformer';
-import { ClientConfigDto } from './dto/client-config.dto';
-import { validate } from 'class-validator';
 import { SchedulerRegistry } from '@nestjs/schedule';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { CronJob } from 'cron';
-import { ICentOpsInterface } from './interfaces/centops.interface';
+import { firstValueFrom } from 'rxjs';
+
+import { ClientConfigDto } from './dto/client-config.dto';
+import { ICentOpsResponse } from './interfaces/centops.interface';
+import { CENT_OPS_CONFIG_TOKEN, CentOpsConfig } from '../../common/config/app.config';
 
 @Injectable()
 export class CentopsService implements OnModuleInit {
@@ -29,7 +30,7 @@ export class CentopsService implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    const job = new CronJob(this.centOpsConfig.cronTime, async () => {
+    const job = new CronJob(this.centOpsConfig.cronTime, async (): Promise<void> => {
       this.logger.debug(
         `Executing cron job '${this.CENTOPS_JOB_NAME}' at ${new Date().toISOString()}`,
       );
@@ -43,10 +44,10 @@ export class CentopsService implements OnModuleInit {
     );
   }
 
-  async handleCron() {
+  async handleCron(): Promise<void> {
     try {
       const { data } = await firstValueFrom(
-        this.httpService.get<ICentOpsInterface>(this.centOpsConfig.url),
+        this.httpService.get<ICentOpsResponse>(this.centOpsConfig.url),
       );
 
       const newConfiguration: ClientConfigDto[] = [];

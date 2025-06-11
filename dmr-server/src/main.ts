@@ -22,4 +22,4 @@ async function bootstrap(): Promise<void> {
     server.listen();
   }
 }
-bootstrap();
+void bootstrap();

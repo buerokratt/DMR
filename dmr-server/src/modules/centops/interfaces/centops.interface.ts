@@ -1,4 +1,4 @@
-export interface ICentOpsInterface {
+export interface ICentOpsResponse {
   response: {
     id: string;
     name: string;

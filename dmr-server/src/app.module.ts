@@ -1,10 +1,11 @@
+import { HttpModule } from '@nestjs/axios';
+import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+
 import { centOpsConfig } from './common/config/app.config';
 import { CentopsModule } from './modules/centops/centops.module';
-import { CacheModule } from '@nestjs/cache-manager';
-import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [

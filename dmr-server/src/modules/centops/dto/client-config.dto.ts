@@ -1,5 +1,4 @@
-import { IsString, IsUUID, IsNotEmpty } from 'class-validator';
-import { Expose } from 'class-transformer';
+import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
 export class ClientConfigDto {
   @IsUUID()
