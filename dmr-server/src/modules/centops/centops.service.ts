@@ -5,10 +5,11 @@ import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { plainToInstance } from 'class-transformer';
-import { CentOpsClientResponseDto, ClientConfigDto } from './dto/client-config.dto';
+import { ClientConfigDto } from './dto/client-config.dto';
 import { validate } from 'class-validator';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { ICentOpsInterface } from './interfaces/centops.interface';
 
 @Injectable()
 export class CentopsService implements OnModuleInit {
@@ -45,7 +46,7 @@ export class CentopsService implements OnModuleInit {
   async handleCron() {
     try {
       const { data } = await firstValueFrom(
-        this.httpService.get<CentOpsClientResponseDto>(this.centOpsConfig.url),
+        this.httpService.get<ICentOpsInterface>(this.centOpsConfig.url),
       );
 
       const newConfiguration: ClientConfigDto[] = [];
