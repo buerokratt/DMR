@@ -6,7 +6,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { of } from 'rxjs';
 import { describe, beforeEach, it, vi, expect } from 'vitest';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 
 describe('CentopsService', () => {
   let service: CentopsService;
