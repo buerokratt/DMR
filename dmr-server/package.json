@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.mts"
+    "test:e2e": "vitest run --config ./vitest.config.e2e.mts",
+    "check:full": "pnpm run format && pnpm run lint && pnpm run format:check && pnpm run lint:check"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
