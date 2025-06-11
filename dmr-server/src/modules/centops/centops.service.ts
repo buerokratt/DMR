@@ -75,10 +75,12 @@ export class CentopsService implements OnModuleInit {
       this.centOpsConfiguration = newConfiguration;
       await this.cacheManager.set(this.CENTOPS_CONFIG_CACHE_KEY, this.centOpsConfiguration);
       this.logger.log('CentOps configuration updated and stored in memory.');
-    } catch (error) {
-      this.logger.error(
-        `Error while get response from ${this.centOpsConfig.url}: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(
+          `Error while get response from ${this.centOpsConfig.url}: ${error.message}`,
+        );
+      }
     }
   }
 }
