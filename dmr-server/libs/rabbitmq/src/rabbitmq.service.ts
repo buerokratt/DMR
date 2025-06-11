@@ -28,7 +28,7 @@ export class RabbitMQService implements OnModuleInit {
   }
 
   async setupQueue(queueName: string, ttl?: number): Promise<void> {
-    const dlqName = `${queueName}_dlq`;
+    const dlqName = this.getDLQName(queueName);
 
     // Create DLQ for our queue
     await this.channel.assertQueue(dlqName, { durable: true });
@@ -37,12 +37,28 @@ export class RabbitMQService implements OnModuleInit {
     await this.channel.assertQueue(queueName, {
       durable: true,
       arguments: {
-        'x-message-ttl': ttl ?? this.ttl, // 30 seconds
+        'x-message-ttl': ttl ?? this.ttl,
         'x-dead-letter-exchange': '', // use default exchange
         'x-dead-letter-routing-key': dlqName,
       },
     });
 
     this.logger.log(`Queue ${queueName} with TTL ${ttl ?? this.ttl}ms and DLQ ${dlqName} set up.`);
+  }
+
+  async deleteQueue(queueName: string): Promise<void> {
+    const dlqName = this.getDLQName(queueName);
+
+    // Delete DLQ for our queue
+    await this.channel.deleteQueue(dlqName);
+
+    // Delete our queue
+    await this.channel.deleteQueue(queueName);
+
+    this.logger.log(`Queue ${queueName} and DLQ ${dlqName} deleted.`);
+  }
+
+  private getDLQName(queueName: string): string {
+    return `${queueName}_dlq`;
   }
 }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { rabbitMQConfig } from 'src/common/config';
 import { RabbitMQService } from './rabbitmq.service';
 
 describe('RabbitMQService', () => {
@@ -8,7 +9,18 @@ describe('RabbitMQService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [RabbitMQService],
+      providers: [
+        RabbitMQService,
+        {
+          provide: rabbitMQConfig.KEY,
+          useValue: {
+            port: 5672,
+            hostname: 'localhost',
+            username: '',
+            password: '',
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<RabbitMQService>(RabbitMQService);

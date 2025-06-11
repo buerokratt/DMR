@@ -5,13 +5,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Cache } from 'cache-manager';
+import { RabbitMQService } from 'libs/rabbitmq';
 import { centOpsConfig } from 'src/common/config';
 import { CentOpsService } from './centops.service';
 
 describe('CentOpsService', () => {
   let service: CentOpsService;
   let httpService: HttpService;
-  let cacheManager: any;
+  let cacheManager: Cache;
   let schedulerRegistry: SchedulerRegistry;
 
   beforeEach(async () => {
@@ -28,6 +30,10 @@ describe('CentOpsService', () => {
         {
           provide: HttpService,
           useValue: { get: vi.fn() },
+        },
+        {
+          provide: RabbitMQService,
+          useValue: { setupQueue: vi.fn(), deleteQueue: vi.fn() },
         },
         {
           provide: CACHE_MANAGER,
@@ -70,13 +76,14 @@ describe('CentOpsService', () => {
       ],
     };
     vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
+    vi.spyOn(cacheManager, 'get').mockResolvedValue(mockData.response);
     vi.spyOn(cacheManager, 'set').mockResolvedValue(true);
 
-    await service.handleCron();
+    const response = await service.syncConfiguration();
 
+    expect(response).toHaveLength(1);
     expect(httpService.get).toHaveBeenCalledWith('http://test-url');
-    expect(cacheManager.set).toHaveBeenCalledWith('centops_configuration', expect.any(Array));
-    expect((service as any).centOpsConfiguration).toHaveLength(1);
+    expect(cacheManager.set).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION', expect.any(Array));
   });
 
   it('should log error if validation fails', async () => {
@@ -92,12 +99,13 @@ describe('CentOpsService', () => {
       ],
     };
     vi.spyOn(httpService, 'get').mockReturnValueOnce(of({ data: mockData } as any));
+    vi.spyOn(cacheManager, 'get').mockResolvedValue(mockData.response);
     const loggerErrorSpy = vi.spyOn((service as any).logger, 'error');
 
-    await service.handleCron();
+    const response = await service.syncConfiguration();
 
     expect(loggerErrorSpy).toHaveBeenCalled();
-    expect((service as any).centOpsConfiguration).toHaveLength(0);
+    expect(response).toHaveLength(0);
   });
 
   it('should log error on http failure', async () => {
@@ -106,7 +114,7 @@ describe('CentOpsService', () => {
     });
     const loggerErrorSpy = vi.spyOn((service as any).logger, 'error');
 
-    await service.handleCron();
+    await service.syncConfiguration();
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Error while get response from'),

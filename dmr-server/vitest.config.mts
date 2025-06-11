@@ -8,11 +8,7 @@ export default defineConfig({
     globals: true,
     root: './',
     coverage: {
-      exclude: [
-        ...configDefaults.exclude,
-        'src/main.ts',
-        '**/*.module.ts',
-      ],
+      exclude: [...configDefaults.exclude, 'src/main.ts', '**/*.module.ts'],
     },
   },
   plugins: [

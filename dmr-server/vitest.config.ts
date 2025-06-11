@@ -1,15 +1,19 @@
-import { defineConfig } from 'vitest/config';
+import path from 'path';
+
 import swc from 'unplugin-swc';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['src/**/*.spec.ts'],
+    include: ['src/**/*.spec.ts', 'libs/**/*.spec.ts'],
     environment: 'node',
     root: './',
   },
   resolve: {
     alias: {
       '@src': './src',
+      'libs/rabbitmq': path.resolve(__dirname, './libs/rabbitmq/src'),
+      'libs/rabbitmq/*': path.resolve(__dirname, './libs/rabbitmq/src/*'),
     },
   },
   plugins: [
