@@ -7,7 +7,6 @@ export class RabbitMQService implements OnModuleInit {
   client: rabbit.ChannelModel;
   channel: rabbit.Channel;
 
-  private readonly ttl = 3600 * 24; // 1 day
   private readonly logger = new Logger(RabbitMQService.name);
 
   constructor(
@@ -27,35 +26,57 @@ export class RabbitMQService implements OnModuleInit {
     this.logger.log('RabbitMQ connected');
   }
 
-  async setupQueue(queueName: string, ttl?: number): Promise<void> {
-    const dlqName = this.getDLQName(queueName);
+  async setupQueue(queueName: string, ttl?: number): Promise<boolean> {
+    try {
+      const dlqName = this.getDLQName(queueName);
 
-    // Create DLQ for our queue
-    await this.channel.assertQueue(dlqName, { durable: true });
+      // Create DLQ for our queue
+      await this.channel.assertQueue(dlqName, { durable: true });
 
-    // Create and setup our queue
-    await this.channel.assertQueue(queueName, {
-      durable: true,
-      arguments: {
-        'x-message-ttl': ttl ?? this.ttl,
-        'x-dead-letter-exchange': '', // use default exchange
-        'x-dead-letter-routing-key': dlqName,
-      },
-    });
+      // Create and setup our queue
+      await this.channel.assertQueue(queueName, {
+        durable: true,
+        arguments: {
+          'x-message-ttl': ttl ?? this.rabbitMQConfig.ttl,
+          'x-dead-letter-exchange': '', // use default exchange
+          'x-dead-letter-routing-key': dlqName,
+        },
+      });
 
-    this.logger.log(`Queue ${queueName} with TTL ${ttl ?? this.ttl}ms and DLQ ${dlqName} set up.`);
+      this.logger.log(
+        `Queue ${queueName} with TTL ${ttl ?? this.rabbitMQConfig.ttl}ms and DLQ ${dlqName} set up.`,
+      );
+
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`Error while setup queue for ${queueName}: ${error.message}`);
+      }
+
+      return false;
+    }
   }
 
-  async deleteQueue(queueName: string): Promise<void> {
-    const dlqName = this.getDLQName(queueName);
+  async deleteQueue(queueName: string): Promise<boolean> {
+    try {
+      const dlqName = this.getDLQName(queueName);
 
-    // Delete DLQ for our queue
-    await this.channel.deleteQueue(dlqName);
+      // Delete DLQ for our queue
+      await this.channel.deleteQueue(dlqName);
 
-    // Delete our queue
-    await this.channel.deleteQueue(queueName);
+      // Delete our queue
+      await this.channel.deleteQueue(queueName);
 
-    this.logger.log(`Queue ${queueName} and DLQ ${dlqName} deleted.`);
+      this.logger.log(`Queue ${queueName} and DLQ ${dlqName} deleted.`);
+
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`Error while setup queue for ${queueName}: ${error.message}`);
+      }
+
+      return false;
+    }
   }
 
   private getDLQName(queueName: string): string {

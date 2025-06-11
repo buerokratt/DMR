@@ -31,7 +31,7 @@ export class CentOpsService implements OnModuleInit {
   onModuleInit(): void {
     const onTick = async (): Promise<void> => {
       this.logger.debug(
-        `Executing cron job '${this.CENT_OPS_JOB_NAME.toString()}' at ${new Date().toISOString()}`,
+        `Executing cron job '${this.CENT_OPS_JOB_NAME}' at ${new Date().toISOString()}`,
       );
 
       await this.syncConfiguration();
@@ -44,7 +44,7 @@ export class CentOpsService implements OnModuleInit {
     job.start();
 
     this.logger.log(
-      `Cron job '${this.CENT_OPS_JOB_NAME.toString()}' scheduled for: ${this.centOpsConfig.cronTime}`,
+      `Cron job '${this.CENT_OPS_JOB_NAME}' scheduled for: ${this.centOpsConfig.cronTime}`,
     );
   }
 
