@@ -1,4 +1,5 @@
 import * as process from 'node:process';
+
 import { registerAs } from '@nestjs/config';
 
 export const CENT_OPS_CONFIG_TOKEN = 'CENT_OPS_CONFIG_TOKEN';

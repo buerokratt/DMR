@@ -1,12 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { CentopsService } from './centops.service';
-import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { SchedulerRegistry } from '@nestjs/schedule';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { of } from 'rxjs';
-import { describe, beforeEach, it, vi, expect } from 'vitest';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { Test, TestingModule } from '@nestjs/testing';
+import { of } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { CentopsService } from './centops.service';
 
 describe('CentopsService', () => {
   let service: CentopsService;
