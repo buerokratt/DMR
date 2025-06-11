@@ -1,23 +1,23 @@
 import eslint from '@eslint/js';
+import vitest from '@vitest/eslint-plugin';
+import * as importPlugin from 'eslint-plugin-import';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import unusedImports from 'eslint-plugin-unused-imports';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import unusedImports from 'eslint-plugin-unused-imports';
-import * as importPlugin from 'eslint-plugin-import';
-import vitest from "@vitest/eslint-plugin";
 
 export default tseslint.config(
   {
-    files: ["**/*.spec.ts"],
+    files: ['**/*.spec.ts'],
     plugins: {
-      vitest
+      vitest,
     },
     rules: {
       ...vitest.configs.recommended.rules,
     },
   },
   {
-    ignores: ['eslint.config.mjs'],
+    ignores: ['eslint.config.mjs', '**/*.spec.ts'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -39,7 +39,7 @@ export default tseslint.config(
   {
     plugins: {
       'unused-imports': unusedImports,
-      'import': importPlugin,
+      import: importPlugin,
     },
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'error',
@@ -64,9 +64,9 @@ export default tseslint.config(
       'import/order': [
         'error',
         {
-          'groups': ['builtin', 'external', ['parent', 'sibling'], 'index'],
+          groups: ['builtin', 'external', ['parent', 'sibling'], 'index'],
           'newlines-between': 'always',
-          'alphabetize': { order: 'asc', caseInsensitive: true },
+          alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],
       'sort-imports': [
@@ -74,6 +74,12 @@ export default tseslint.config(
         {
           ignoreCase: true,
           ignoreDeclarationSort: true,
+        },
+      ],
+      'prettier/prettier': [
+        'error',
+        {
+          endOfLine: 'auto',
         },
       ],
     },

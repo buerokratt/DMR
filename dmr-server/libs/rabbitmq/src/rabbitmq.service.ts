@@ -1,29 +1,33 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as rabbit from 'amqplib';
+import { RabbitMQConfig, rabbitMQConfig } from 'src/common/config';
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit {
-  private readonly logger = new Logger(RabbitMQService.name);
-
-  constructor() {}
-
   client: rabbit.ChannelModel;
   channel: rabbit.Channel;
 
-  //Sherifbai is implementing config module, I am going to integrate it then
+  private readonly ttl = 3600 * 24; // 1 day
+  private readonly logger = new Logger(RabbitMQService.name);
+
+  constructor(
+    @Inject(rabbitMQConfig.KEY)
+    private readonly rabbitMQConfig: RabbitMQConfig,
+  ) {}
+
   async onModuleInit(): Promise<void> {
     this.client = await rabbit.connect({
-      hostname: 'localhost',
-      port: 5672,
-      username: 'admin',
-      password: 'admin',
+      port: this.rabbitMQConfig.port,
+      hostname: this.rabbitMQConfig.hostname,
+      username: this.rabbitMQConfig.username,
+      password: this.rabbitMQConfig.password,
     });
 
     this.channel = await this.client.createChannel();
     this.logger.log('RabbitMQ connected');
   }
 
-  async setupQueue(queueName: string, ttl: number = 30000): Promise<void> {
+  async setupQueue(queueName: string, ttl?: number): Promise<void> {
     const dlqName = `${queueName}_dlq`;
 
     // Create DLQ for our queue
@@ -33,12 +37,12 @@ export class RabbitMQService implements OnModuleInit {
     await this.channel.assertQueue(queueName, {
       durable: true,
       arguments: {
-        'x-message-ttl': ttl, // 30 seconds
+        'x-message-ttl': ttl ?? this.ttl, // 30 seconds
         'x-dead-letter-exchange': '', // use default exchange
         'x-dead-letter-routing-key': dlqName,
       },
     });
 
-    console.log(`Queue ${queueName} with TTL ${ttl}ms and DLQ ${dlqName} set up.`);
+    console.log(`Queue ${queueName} with TTL ${ttl ?? this.ttl}ms and DLQ ${dlqName} set up.`);
   }
 }
