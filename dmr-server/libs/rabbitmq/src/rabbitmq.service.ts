@@ -43,6 +43,6 @@ export class RabbitMQService implements OnModuleInit {
       },
     });
 
-    console.log(`Queue ${queueName} with TTL ${ttl ?? this.ttl}ms and DLQ ${dlqName} set up.`);
+    this.logger.log(`Queue ${queueName} with TTL ${ttl ?? this.ttl}ms and DLQ ${dlqName} set up.`);
   }
 }
