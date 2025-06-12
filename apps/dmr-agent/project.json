@@ -1,0 +1,64 @@
+{
+  "name": "dmr-agent",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/dmr-agent/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "args": ["node-env=production"]
+      },
+      "configurations": {
+        "development": {
+          "args": ["node-env=development"]
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "dmr-agent:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "dmr-agent:build:development"
+        },
+        "production": {
+          "buildTarget": "dmr-agent:build:production"
+        }
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/apps/dmr-agent"],
+      "options": {
+        "passWithNoTests": true,
+        "reportsDirectory": "../../coverage/apps/dmr-agent",
+        "config": "vitest.config.mts"
+      }
+    },
+    "e2e": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/apps/dmr-agent-e2e"],
+      "options": {
+        "passWithNoTests": true,
+        "reportsDirectory": "../../coverage/apps/dmr-agent-e2e",
+        "config": "apps/dmr-agent/vitest.config.e2e.mts"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/dmr-agent/**/*.ts"]
+      }
+    }
+  }
+}

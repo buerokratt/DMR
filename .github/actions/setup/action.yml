@@ -1,0 +1,12 @@
+name: Setup Environment
+description: Sets up Node.js and pnpm environment
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version-file: package.json
+        cache: pnpm
+    - shell: bash
+      run: pnpm install

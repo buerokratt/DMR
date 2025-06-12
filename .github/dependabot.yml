@@ -1,53 +1,30 @@
 version: 2
 updates:
-  # DMR Server dependencies
-  - package-ecosystem: "npm"
-    directory: "/dmr-server"
+  # Workspace dependencies
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "daily"
-      time: "00:00"
-      timezone: "Europe/Tallinn"
+      interval: 'daily'
+      time: '00:00'
+      timezone: 'Europe/Tallinn'
     labels:
-      - "dependencies"
-      - "dmr-server"
+      - 'dependencies'
     open-pull-requests-limit: 10
-    target-branch: "dev"
+    target-branch: 'dev'
     pull-request-branch-name:
-      separator: "/"
+      separator: '/'
     groups:
+      nx:
+        patterns:
+          - '@nx/*'
+          - '@nrwl/*'
       nestjs:
         patterns:
-          - "@nestjs/*"
+          - '@nestjs/*'
       typescript-eslint:
         patterns:
-          - "@typescript-eslint/*"
+          - '@typescript-eslint/*'
       vitest:
         patterns:
-          - "vitest"
-          - "@vitest/*"
-
-  # DMR Agent dependencies
-  - package-ecosystem: "npm"
-    directory: "/dmr-agent"
-    schedule:
-      interval: "daily"
-      time: "00:00"
-      timezone: "Europe/Tallinn"
-    labels:
-      - "dependencies"
-      - "dmr-agent"
-    open-pull-requests-limit: 10
-    target-branch: "dev"
-    pull-request-branch-name:
-      separator: "/"
-    groups:
-      nestjs:
-        patterns:
-          - "@nestjs/*"
-      typescript-eslint:
-        patterns:
-          - "@typescript-eslint/*"
-      vitest:
-        patterns:
-          - "vitest"
-          - "@vitest/*"
+          - 'vitest'
+          - '@vitest/*'

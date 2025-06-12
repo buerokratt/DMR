@@ -66,3 +66,44 @@ graph TD
 - Has a dead letter queue for messages that failed to deliver.
 - Has RabbitMQ UI-based monitoring tools set up.
 - Supports RabbitMQ clustering for scalability.
+
+## Available Scripts
+
+### Development
+
+- `start:server`: Start the DMR server in development mode
+- `start:agent`: Start the DMR agent in development mode
+
+### Building
+
+- `build`: Build all applications
+- `build:server`: Build only the DMR server
+- `build:agent`: Build only the DMR agent
+
+### Testing
+
+- `test`: Run tests for all applications
+- `test:server`: Run tests for DMR server
+- `test:agent`: Run tests for DMR agent
+- `e2e`: Run end-to-end tests for all applications
+- `e2e:server`: Run end-to-end tests for DMR server
+- `e2e:agent`: Run end-to-end tests for DMR agent
+
+For detailed test output, you can add the `--reporter=verbose` flag to any test command:
+
+```bash
+pnpm test:server -- --reporter=verbose
+pnpm e2e:server -- --reporter=verbose
+```
+
+### Code Quality
+
+- `lint`: Run ESLint on all files
+- `lint:check`: Check for ESLint errors with zero warnings allowed
+- `lint:fix`: Fix auto-fixable ESLint issues
+- `format`: Format code using Prettier
+- `format:check`: Check code formatting
+
+### Utility
+
+- `clean`: Clean build artifacts and cache

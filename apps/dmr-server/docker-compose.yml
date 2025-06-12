@@ -1,0 +1,29 @@
+services:
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+    env_file:
+      - .env
+    configs:
+      - source: rabbitmq-plugins
+        target: /etc/rabbitmq/enabled_plugins
+    volumes:
+      - rabbitmq_lib:/var/lib/rabbitmq/
+      - rabbitmq_log:/var/log/rabbitmq
+
+configs:
+  rabbitmq-plugins:
+    content: '[rabbitmq_management].'
+
+volumes:
+  rabbitmq_lib:
+  rabbitmq_log:
+
+networks:
+  default:
+    name: dmr-service
+    external: true

@@ -1,0 +1,52 @@
+name: Run checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, ready_for_review, reopened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - name: format
+            command: npx nx format:check --all
+          - name: lint
+            command: npx nx run-many --target=lint:check --all
+          - name: test
+            command: npx nx run-many --target=test --all
+          - name: test-e2e
+            command: npx nx run-many --target=test:e2e --all
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: ${{ matrix.command }}
+
+  build:
+    needs: checks
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        app: [dmr-server, dmr-client, dmr-agent]
+    name: build-${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build Docker image
+        run: |
+          APP_PATH="apps/${{ matrix.app }}/Dockerfile"
+          if [ -f "$APP_PATH" ]; then
+            echo "Building Docker image for ${{ matrix.app }}"
+            docker build -f "$APP_PATH" .
+          fi
