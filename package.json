@@ -19,7 +19,8 @@
     "e2e": "nx run-many --target=e2e --all",
     "e2e:server": "nx e2e dmr-server ",
     "e2e:agent": "nx e2e dmr-agent",
-    "clean": "rimber dist node_modules/.cache"
+    "clean": "rimber dist node_modules/.cache",
+    "check:full": "pnpm run format && pnpm run lint && pnpm run format:check && pnpm run lint:check"
   },
   "engines": {
     "node": ">=22.16.0",

@@ -31,12 +31,16 @@ export class RabbitMQService implements OnModuleInit {
       const dlqName = this.getDLQName(queueName);
 
       // Create DLQ for our queue
-      await this.channel.assertQueue(dlqName, { durable: true });
+      await this.channel.assertQueue(dlqName, {
+        durable: true,
+        arguments: { 'x-queue-type': 'quorum', 'x-message-ttl': this.rabbitMQConfig.dlqTTL },
+      });
 
       // Create and setup our queue
       await this.channel.assertQueue(queueName, {
         durable: true,
         arguments: {
+          'x-queue-type': 'quorum',
           'x-message-ttl': ttl ?? this.rabbitMQConfig.ttl,
           'x-dead-letter-exchange': '', // use default exchange
           'x-dead-letter-routing-key': dlqName,
@@ -80,6 +84,6 @@ export class RabbitMQService implements OnModuleInit {
   }
 
   private getDLQName(queueName: string): string {
-    return `${queueName}_dlq`;
+    return `${queueName}.dlq`;
   }
 }

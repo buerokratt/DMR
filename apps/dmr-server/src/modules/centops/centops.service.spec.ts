@@ -82,6 +82,7 @@ describe('CentOpsService', () => {
 
     expect(response).toHaveLength(1);
     expect(httpService.get).toHaveBeenCalledWith('http://test-url');
+    expect(cacheManager.get).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION');
     expect(cacheManager.set).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION', expect.any(Array));
   });
 
