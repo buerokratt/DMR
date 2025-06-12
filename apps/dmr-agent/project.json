@@ -41,7 +41,7 @@
       "options": {
         "passWithNoTests": true,
         "reportsDirectory": "../../coverage/apps/dmr-agent",
-        "config": "vitest.config.mts"
+        "config": "apps/dmr-agent/vitest.config.ts"
       }
     },
     "e2e": {
