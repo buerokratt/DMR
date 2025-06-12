@@ -1,6 +1,6 @@
 import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -11,7 +11,6 @@ import { ClientConfigDto, ICentOpsResponse } from '@dmr/shared';
 
 @Injectable()
 export class CentOpsService implements OnModuleInit {
-  private centOpsConfiguration: ClientConfigDto[] = [];
   private readonly CENTOPS_CONFIG_CACHE_KEY = 'centops_configuration';
   private readonly CENTOPS_JOB_NAME = 'centops_config_fetch';
   private readonly logger = new Logger(CentOpsService.name);
@@ -31,12 +30,25 @@ export class CentOpsService implements OnModuleInit {
       );
       await this.handleCron();
     });
-    //@ts-ignore
+
     this.schedulerRegistry.addCronJob(this.CENTOPS_JOB_NAME, job);
     job.start();
     this.logger.log(
       `Cron job '${this.CENTOPS_JOB_NAME}' scheduled for: ${this.centOpsConfig.cronTime}`,
     );
+  }
+
+  async getCentOpsConfigurationByClientId(clientId: string): Promise<ClientConfigDto> {
+    const centOpsConfigs = await this.cacheManager.get<ClientConfigDto[]>(
+      this.CENTOPS_CONFIG_CACHE_KEY,
+    );
+
+    const clientConfig = centOpsConfigs.find((config) => config.id === clientId);
+    if (!clientConfig) {
+      throw new BadRequestException('Client configuration not found');
+    }
+
+    return clientConfig;
   }
 
   async handleCron(): Promise<void> {
@@ -67,8 +79,7 @@ export class CentOpsService implements OnModuleInit {
         newConfiguration.push(clientConfig);
       }
 
-      this.centOpsConfiguration = newConfiguration;
-      await this.cacheManager.set(this.CENTOPS_CONFIG_CACHE_KEY, this.centOpsConfiguration);
+      await this.cacheManager.set(this.CENTOPS_CONFIG_CACHE_KEY, newConfiguration);
       this.logger.log('CentOps configuration updated and stored in memory.');
     } catch (error: unknown) {
       if (error instanceof Error) {

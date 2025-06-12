@@ -4,5 +4,6 @@ import { CentOpsService } from './centops.service';
 
 @Module({
   providers: [CentOpsService],
+  exports: [CentOpsService],
 })
 export class CentOpsModule {}

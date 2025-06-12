@@ -75,7 +75,6 @@ describe('CentOpsService', () => {
 
     expect(httpService.get).toHaveBeenCalledWith('http://test-url');
     expect(cacheManager.set).toHaveBeenCalledWith('centops_configuration', expect.any(Array));
-    expect((service as any).centOpsConfiguration).toHaveLength(1);
   });
 
   it('should log error if validation fails', async () => {
@@ -96,7 +95,6 @@ describe('CentOpsService', () => {
     await service.handleCron();
 
     expect(loggerErrorSpy).toHaveBeenCalled();
-    expect((service as any).centOpsConfiguration).toHaveLength(0);
   });
 
   it('should log error on http failure', async () => {

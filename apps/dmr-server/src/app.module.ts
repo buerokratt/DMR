@@ -6,6 +6,8 @@ import { HttpModule } from '@nestjs/axios';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './rabbitmq/src';
 import { CentOpsModule } from './modules/centops/centops.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { CentOpsModule } from './modules/centops/centops.module';
     HealthModule,
     RabbitMQModule,
     CentOpsModule,
+    AuthModule,
+    GatewayModule,
   ],
 })
 export class AppModule {}
