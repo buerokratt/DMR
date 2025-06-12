@@ -6,10 +6,10 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
 
-import { CentOpsConfig, centOpsConfig } from '../../common/config';
 import { ClientConfigDto, ICentOpsResponse, Utils } from '@dmr/shared';
-import { RabbitMQService } from '../../libs/rabbitmq';
 import { CronJob } from 'cron';
+import { CentOpsConfig, centOpsConfig } from '../../common/config';
+import { RabbitMQService } from '../../libs/rabbitmq';
 
 @Injectable()
 export class CentOpsService implements OnModuleInit {

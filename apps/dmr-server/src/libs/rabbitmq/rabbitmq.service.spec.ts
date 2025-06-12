@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { RabbitMQService } from './rabbitmq.service';
 import { rabbitMQConfig } from '../../common/config';
+import { RabbitMQService } from './rabbitmq.service';
 
 vi.mock('amqplib', async () => {
   const assertQueueMock = vi.fn();
@@ -46,6 +46,7 @@ describe('RabbitMQService', () => {
             username: '',
             password: '',
             ttl: 60000,
+            dlqTTL: 60000,
           },
         },
       ],
@@ -64,13 +65,19 @@ describe('RabbitMQService', () => {
     const result = await service.setupQueue('test-queue', 1000);
 
     expect(result).toBe(true);
-    expect(assertQueueMock).toHaveBeenCalledWith('test-queue_dlq', { durable: true });
+    expect(assertQueueMock).toHaveBeenCalledWith('test-queue.dlq', {
+      durable: true,
+      arguments: { 'x-queue-type': 'quorum', 'x-message-ttl': 60000 },
+    });
+
     expect(assertQueueMock).toHaveBeenCalledWith(
       'test-queue',
       expect.objectContaining({
         durable: true,
         arguments: expect.objectContaining({
-          'x-dead-letter-routing-key': 'test-queue_dlq',
+          'x-queue-type': 'quorum',
+          'x-dead-letter-exchange': '',
+          'x-dead-letter-routing-key': 'test-queue.dlq',
           'x-message-ttl': 1000,
         }),
       }),
@@ -81,7 +88,7 @@ describe('RabbitMQService', () => {
     const result = await service.deleteQueue('test-queue');
 
     expect(result).toBe(true);
-    expect(deleteQueueMock).toHaveBeenCalledWith('test-queue_dlq');
+    expect(deleteQueueMock).toHaveBeenCalledWith('test-queue.dlq');
     expect(deleteQueueMock).toHaveBeenCalledWith('test-queue');
   });
 });
