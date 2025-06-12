@@ -26,22 +26,3 @@ import { HttpModule } from '@nestjs/axios';
   ],
 })
 export class CommonModule {}
-
-export const CommonModules = [
-  ConfigModule.forRoot({
-    load: configs,
-    isGlobal: true,
-    cache: true,
-    expandVariables: true,
-    envFilePath: ['.env'],
-    validationOptions: {
-      allowUnknown: true,
-      abortEarly: true,
-    },
-  }),
-  ScheduleModule.forRoot(),
-  CacheModule.register({
-    isGlobal: true,
-  }),
-  HttpModule.register({ global: true }),
-];
