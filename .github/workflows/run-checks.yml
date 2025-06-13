@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        app: [dmr-server, dmr-client, dmr-agent]
+        app: [dmr-server, dmr-agent]
     name: build-${{ matrix.app }}
     steps:
       - uses: actions/checkout@v4
