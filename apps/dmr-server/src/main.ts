@@ -5,8 +5,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
 import { setupServer } from 'msw/node';
 import { AppModule } from './app.module';
-import { handlers } from './mocks/handlers/centops.response';
 import { APP_CONFIG_TOKEN, AppConfig, GlobalConfig } from './common/config';
+import { handlers } from './mocks/handlers/centops.response';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: true });
@@ -27,6 +27,7 @@ async function bootstrap(): Promise<void> {
     const server = setupServer(...handlers);
     server.listen();
   }
+
   Logger.log(`🚀 Application is running on: http://localhost:${appConfig.port}`);
 }
 
