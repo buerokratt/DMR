@@ -60,7 +60,8 @@ export class RabbitMQService implements OnModuleInit {
 
   private scheduleReconnect(): void {
     if (this.schedulerRegistry.doesExist('interval', this.RECONNECT_INTERVAL_NAME)) {
-      return; // already planned
+      // Interval already exist
+      return;
     }
 
     const callback = async () => {

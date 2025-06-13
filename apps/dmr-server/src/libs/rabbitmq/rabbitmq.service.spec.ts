@@ -1,3 +1,4 @@
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +32,6 @@ vi.mock('amqplib', async () => {
   };
 });
 
-import { SchedulerRegistry } from '@nestjs/schedule';
 import * as amqplib from 'amqplib';
 const { assertQueueMock, deleteQueueMock } = (amqplib as any).__mocks;
 
