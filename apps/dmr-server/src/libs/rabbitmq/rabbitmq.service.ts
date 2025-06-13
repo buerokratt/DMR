@@ -60,7 +60,7 @@ export class RabbitMQService implements OnModuleInit {
 
   private scheduleReconnect(): void {
     if (this.schedulerRegistry.doesExist('interval', this.RECONNECT_INTERVAL_NAME)) {
-      // Interval already exist
+      // Interval already exists
       return;
     }
 
@@ -84,6 +84,12 @@ export class RabbitMQService implements OnModuleInit {
   async setupQueue(queueName: string, ttl?: number): Promise<boolean> {
     try {
       const dlqName = this.getDLQName(queueName);
+
+      const alreadyExist = await this.checkQueue(queueName);
+
+      if (alreadyExist) {
+        return true;
+      }
 
       // Create DLQ for our queue
       await this._channel.assertQueue(dlqName, {
@@ -134,6 +140,16 @@ export class RabbitMQService implements OnModuleInit {
         this.logger.error(`Error while setup queue for ${queueName}: ${error.message}`);
       }
 
+      return false;
+    }
+  }
+
+  async checkQueue(queueName: string): Promise<boolean> {
+    try {
+      await this._channel.checkQueue(queueName);
+
+      return true;
+    } catch {
       return false;
     }
   }

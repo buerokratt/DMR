@@ -6,14 +6,17 @@ import { rabbitMQConfig } from '../../common/config';
 import { RabbitMQService } from './rabbitmq.service';
 
 vi.mock('amqplib', async () => {
-  const onMock = vi.fn();
+  const checkQueueMock = vi.fn();
   const assertQueueMock = vi.fn();
   const deleteQueueMock = vi.fn();
 
   const createChannelMock = vi.fn().mockResolvedValue({
+    checkQueue: checkQueueMock,
     assertQueue: assertQueueMock,
     deleteQueue: deleteQueueMock,
   });
+
+  const onMock = vi.fn();
 
   const connectMock = vi.fn().mockResolvedValue({
     on: onMock,
@@ -28,12 +31,13 @@ vi.mock('amqplib', async () => {
       createChannelMock,
       assertQueueMock,
       deleteQueueMock,
+      checkQueueMock,
     },
   };
 });
 
 import * as amqplib from 'amqplib';
-const { assertQueueMock, deleteQueueMock } = (amqplib as any).__mocks;
+const { assertQueueMock, deleteQueueMock, checkQueueMock } = (amqplib as any).__mocks;
 
 describe('RabbitMQService', () => {
   let service: RabbitMQService;
@@ -106,10 +110,28 @@ describe('RabbitMQService', () => {
     vi.useRealTimers();
   });
 
+  it('should return true if queue exists', async () => {
+    const checkQueue = checkQueueMock.mockResolvedValue(true);
+    const result = await service.checkQueue('test-queue');
+
+    expect(result).toBe(true);
+    expect(checkQueue).toHaveBeenCalledWith('test-queue');
+  });
+
+  it('should return false if queue does not exist', async () => {
+    const checkQueue = checkQueueMock.mockRejectedValueOnce(new Error('Not Found'));
+    const result = await service.checkQueue('test-queue');
+
+    expect(result).toBe(false);
+    expect(checkQueue).toHaveBeenCalledWith('test-queue');
+  });
+
   it('should setup queue and DLQ', async () => {
+    const checkQueue = checkQueueMock.mockRejectedValueOnce(new Error('Not Found'));
     const result = await service.setupQueue('test-queue', 1000);
 
     expect(result).toBe(true);
+    expect(checkQueue).toHaveBeenCalledWith('test-queue');
     expect(assertQueueMock).toHaveBeenCalledWith('test-queue.dlq', {
       durable: true,
       arguments: { 'x-queue-type': 'quorum', 'x-message-ttl': 60000 },
