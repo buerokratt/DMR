@@ -18,8 +18,8 @@ export class WsAuthGuard implements CanActivate {
     }
 
     try {
-      const verify = await this.authService.verifyToken(token);
-      Object.assign(client, { user: verify });
+      const jwtPayload = await this.authService.verifyToken(token);
+      Object.assign(client, { agent: jwtPayload });
     } catch {
       client.disconnect();
 
