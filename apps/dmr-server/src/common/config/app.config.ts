@@ -7,6 +7,7 @@ export type Environment = 'development' | 'production';
 export const appConfig = registerAs(APP_CONFIG_TOKEN, () => ({
   port: Number(process.env.PORT ?? 5000),
   environment: (process.env.ENVIRONMENT as Environment) || 'development',
+  websocketMaxDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION || '120000'),
 }));
 
 export type AppConfig = ConfigType<typeof appConfig>;
