@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { CentOpsService } from '../centops/centops.service';
-import { IDecodedJwt, IJwtHeader } from './interfaces/heades.interface';
+import { DecodedJwt, JwtHeader } from './interfaces/headers.interface';
 import { JwtService } from '@nestjs/jwt';
-import { IJwtPayload } from '@dmr/shared';
+import { JwtPayload } from '@dmr/shared';
 
 @Injectable()
 export class AuthService {
@@ -13,18 +13,40 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async verifyToken(token: string) {
+  async verifyToken(token: string): Promise<JwtPayload> {
     const clientId = this.getKidFromToken(token);
-    const clientConfig = await this.centOpsService.getCentOpsConfigurationByClientId(clientId);
 
-    return this.jwtService.verifyAsync<IJwtPayload>(token, {
-      publicKey: clientConfig.authenticationCertificate,
-    });
+    if (!clientId) {
+      throw new BadRequestException('Token kid is missing or invalid');
+    }
+
+    const clientConfig = await this.centOpsService.getCentOpsConfigurationByClientId(clientId);
+    let verifiedToken: JwtPayload;
+
+    try {
+      verifiedToken = await this.jwtService.verifyAsync<JwtPayload>(token, {
+        publicKey: clientConfig.authenticationCertificate,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('Error verifying JWT:', error.message);
+      }
+
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    if (verifiedToken.sub !== clientId) {
+      this.logger.error('Token sub and kid do not match');
+
+      throw new BadRequestException('Token sub and kid do not match');
+    }
+
+    return verifiedToken;
   }
 
-  private decodeJwtHeader(token: string): IJwtHeader | null {
+  private decodeJwtHeader(token: string): JwtHeader | null {
     try {
-      const decoded: IDecodedJwt = this.jwtService.decode(token, { complete: true });
+      const decoded: DecodedJwt = this.jwtService.decode(token, { complete: true });
 
       if (
         decoded &&

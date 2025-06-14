@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { CentOpsService } from '../centops/centops.service';
 import { JwtService } from '@nestjs/jwt';
-import { IJwtPayload } from '@dmr/shared';
-import { Logger } from '@nestjs/common';
+import { JwtPayload } from '@dmr/shared';
+import { Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
 
 const mockCentOpsService = {
@@ -57,10 +57,10 @@ describe('AuthService', () => {
     const testToken = 'mocked.jwt.token';
     const mockClientId = 'mockKid123';
     const mockPublicKey = '-----BEGIN PUBLIC KEY-----mockKey-----END PUBLIC KEY-----';
-    const mockPayload: IJwtPayload = { sub: 'user123', iat: 123, exp: 123 };
+    const mockPayload: JwtPayload = { sub: mockClientId, iat: 123, exp: 123 }; // sub matches clientId
 
     it('should successfully verify a token', async () => {
-      vi.spyOn(authService as any, 'decodeJwtHeader').mockReturnValue({ kid: mockClientId });
+      vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
       mockCentOpsService.getCentOpsConfigurationByClientId.mockResolvedValueOnce({
         authenticationCertificate: mockPublicKey,
       });
@@ -68,7 +68,7 @@ describe('AuthService', () => {
 
       const result = await authService.verifyToken(testToken);
 
-      expect(authService['decodeJwtHeader']).toHaveBeenCalledWith(testToken);
+      expect(authService['getKidFromToken']).toHaveBeenCalledWith(testToken);
       expect(mockCentOpsService.getCentOpsConfigurationByClientId).toHaveBeenCalledWith(
         mockClientId,
       );
@@ -78,47 +78,70 @@ describe('AuthService', () => {
       expect(result).toEqual(mockPayload);
     });
 
-    it('should throw an error if getKidFromToken returns null', async () => {
-      vi.spyOn(authService as any, 'decodeJwtHeader').mockReturnValue(null);
-      mockCentOpsService.getCentOpsConfigurationByClientId.mockRejectedValueOnce(
-        new Error('Client ID cannot be null'),
-      );
+    it('should throw BadRequestException if getKidFromToken returns null', async () => {
+      vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(null);
 
-      await expect(authService.verifyToken(testToken)).rejects.toThrow();
-      expect(authService['decodeJwtHeader']).toHaveBeenCalledWith(testToken);
-      expect(mockCentOpsService.getCentOpsConfigurationByClientId).toHaveBeenCalledWith(null);
+      await expect(authService.verifyToken(testToken)).rejects.toThrow(
+        new BadRequestException('Token kid is missing or invalid'),
+      );
+      expect(authService['getKidFromToken']).toHaveBeenCalledWith(testToken);
+      expect(mockCentOpsService.getCentOpsConfigurationByClientId).not.toHaveBeenCalled();
       expect(mockJwtService.verifyAsync).not.toHaveBeenCalled();
     });
 
     it('should throw an error if CentOpsService fails to get configuration', async () => {
-      vi.spyOn(authService as any, 'decodeJwtHeader').mockReturnValue({ kid: mockClientId });
+      vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
       const centOpsError = new Error('CentOps config error');
       mockCentOpsService.getCentOpsConfigurationByClientId.mockRejectedValueOnce(centOpsError);
 
       await expect(authService.verifyToken(testToken)).rejects.toThrow(centOpsError);
-      expect(authService['decodeJwtHeader']).toHaveBeenCalledWith(testToken);
+      expect(authService['getKidFromToken']).toHaveBeenCalledWith(testToken);
       expect(mockCentOpsService.getCentOpsConfigurationByClientId).toHaveBeenCalledWith(
         mockClientId,
       );
       expect(mockJwtService.verifyAsync).not.toHaveBeenCalled();
     });
 
-    it('should throw an error if token verification fails', async () => {
-      vi.spyOn(authService as any, 'decodeJwtHeader').mockReturnValue({ kid: mockClientId });
+    it('should throw UnauthorizedException and log error if token verification fails', async () => {
+      vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
       mockCentOpsService.getCentOpsConfigurationByClientId.mockResolvedValueOnce({
         authenticationCertificate: mockPublicKey,
       });
       const verificationError = new Error('Invalid signature');
       mockJwtService.verifyAsync.mockRejectedValueOnce(verificationError);
 
-      await expect(authService.verifyToken(testToken)).rejects.toThrow(verificationError);
-      expect(authService['decodeJwtHeader']).toHaveBeenCalledWith(testToken);
+      await expect(authService.verifyToken(testToken)).rejects.toThrow(
+        new UnauthorizedException('Invalid token'),
+      );
+      expect(authService['getKidFromToken']).toHaveBeenCalledWith(testToken);
       expect(mockCentOpsService.getCentOpsConfigurationByClientId).toHaveBeenCalledWith(
         mockClientId,
       );
       expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(testToken, {
         publicKey: mockPublicKey,
       });
+      expect(loggerSpy).toHaveBeenCalledWith('Error verifying JWT:', verificationError.message);
+    });
+
+    it('should throw BadRequestException if token sub and kid do not match', async () => {
+      const mismatchedPayload: JwtPayload = { sub: 'different-user', iat: 123, exp: 123 };
+      vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
+      mockCentOpsService.getCentOpsConfigurationByClientId.mockResolvedValueOnce({
+        authenticationCertificate: mockPublicKey,
+      });
+      mockJwtService.verifyAsync.mockResolvedValueOnce(mismatchedPayload);
+
+      await expect(authService.verifyToken(testToken)).rejects.toThrow(
+        new BadRequestException('Token sub and kid do not match'),
+      );
+      expect(authService['getKidFromToken']).toHaveBeenCalledWith(testToken);
+      expect(mockCentOpsService.getCentOpsConfigurationByClientId).toHaveBeenCalledWith(
+        mockClientId,
+      );
+      expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(testToken, {
+        publicKey: mockPublicKey,
+      });
+      expect(loggerSpy).toHaveBeenCalledWith('Token sub and kid do not match');
     });
   });
 
