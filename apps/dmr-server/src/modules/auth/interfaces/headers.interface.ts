@@ -1,12 +1,12 @@
-export interface IJwtHeader {
+export interface JwtHeader {
   alg?: string;
   typ?: string;
   kid?: string;
   [key: string]: unknown;
 }
 
-export interface IDecodedJwt {
-  header: IJwtHeader;
+export interface DecodedJwt {
+  header: JwtHeader;
   payload: unknown;
   signature: string;
 }
