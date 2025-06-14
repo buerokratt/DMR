@@ -46,13 +46,20 @@ export class CentOpsService implements OnModuleInit {
     );
   }
 
-  async getCentOpsConfigurationByClientId(clientId: string): Promise<ClientConfigDto> {
-    const centOpsConfigs = await this.cacheManager.get<ClientConfigDto[]>(
-      this.CENT_OPS_CONFIG_CACHE_KEY,
-    );
+  async getCentOpsConfigurationByClientId(clientId: string): Promise<ClientConfigDto | null> {
+    const centOpsConfigs =
+      (await this.cacheManager.get<ClientConfigDto[]>(this.CENT_OPS_CONFIG_CACHE_KEY)) || [];
+
+    if (centOpsConfigs.length === 0) {
+      this.logger.error('CentOps configuration is empty');
+
+      throw new BadRequestException('CentOps configuration is empty');
+    }
 
     const clientConfig = centOpsConfigs.find((config) => config.id === clientId);
     if (!clientConfig) {
+      this.logger.error(`Client configuration not found by ${clientId}`);
+
       throw new BadRequestException('Client configuration not found');
     }
 
