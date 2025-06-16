@@ -45,9 +45,9 @@ describe('CentOpsService', () => {
       ],
     }).compile();
 
-    service = module.get<CentOpsService>(CentOpsService);
-    httpService = module.get<HttpService>(HttpService);
     cacheManager = module.get(CACHE_MANAGER);
+    httpService = module.get<HttpService>(HttpService);
+    service = module.get<CentOpsService>(CentOpsService);
     schedulerRegistry = module.get<SchedulerRegistry>(SchedulerRegistry);
   });
 
