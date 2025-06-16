@@ -7,13 +7,11 @@ import {
   OnGatewayDisconnect,
   OnGatewayConnection,
 } from '@nestjs/websockets';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
-import { WsAuthGuard } from '../auth/guards/ws-auth.guard';
 import { RabbitMQService } from '../../libs/rabbitmq';
 
-@UseGuards(WsAuthGuard)
 @WebSocketGateway({
   connectionStateRecovery: {
     maxDisconnectionDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION || '120000'),
@@ -38,7 +36,11 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const jwtPayload = await this.authService.verifyToken(token);
 
-      void this.rabbitService.setupQueue(jwtPayload.sub);
+      const consume = await this.rabbitService.subscribe(jwtPayload.sub);
+
+      if (!consume) {
+        client.disconnect();
+      }
 
       Object.assign(client, { agent: jwtPayload });
     } catch {
@@ -51,8 +53,9 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const agentId = client?.agent?.sub;
 
     if (agentId) {
-      await this.rabbitService.deleteQueue(agentId);
+      await this.rabbitService.unsubscribe(agentId);
     }
+
     this.logger.log(`Agent disconnected: ${agentId} (Socket ID: ${client.id})`);
   }
 

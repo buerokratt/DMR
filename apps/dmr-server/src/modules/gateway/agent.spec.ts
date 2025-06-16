@@ -18,8 +18,8 @@ const mockAuthService = {
 };
 
 const mockRabbitMQService = {
-  setupQueue: vi.fn(),
-  deleteQueue: vi.fn(),
+  subscribe: vi.fn(),
+  unsubscribe: vi.fn(),
 };
 
 describe('AgentGateway', () => {
@@ -101,18 +101,50 @@ describe('AgentGateway', () => {
   describe('handleConnection', () => {
     const mockPayload = { sub: 'testAgentId', iat: 123, exp: 123 };
 
-    it('should allow connection for a valid token and setup queue', async () => {
+    it('should allow connection for a valid token and subscribe to RabbitMQ when consume is truthy', async () => {
       const token = 'valid.jwt.token';
       const client = createMockSocket(token);
 
       mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
-      mockRabbitMQService.setupQueue.mockResolvedValueOnce(undefined);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true); // consume is truthy
 
       await gateway.handleConnection(client);
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith(token);
-      expect(mockRabbitMQService.setupQueue).toHaveBeenCalledWith('testAgentId');
+      expect(mockRabbitMQService.subscribe).toHaveBeenCalledWith('testAgentId');
       expect(client.disconnect).not.toHaveBeenCalled();
+      expect((client as any).agent).toEqual(mockPayload);
+      expect(loggerErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it('should disconnect client when consume is falsy', async () => {
+      const token = 'valid.jwt.token';
+      const client = createMockSocket(token);
+
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(false); // consume is falsy
+
+      await gateway.handleConnection(client);
+
+      expect(mockAuthService.verifyToken).toHaveBeenCalledWith(token);
+      expect(mockRabbitMQService.subscribe).toHaveBeenCalledWith('testAgentId');
+      expect(client.disconnect).toHaveBeenCalledOnce();
+      expect((client as any).agent).toEqual(mockPayload);
+      expect(loggerErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it('should disconnect client when consume is null', async () => {
+      const token = 'valid.jwt.token';
+      const client = createMockSocket(token);
+
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(null); // consume is null
+
+      await gateway.handleConnection(client);
+
+      expect(mockAuthService.verifyToken).toHaveBeenCalledWith(token);
+      expect(mockRabbitMQService.subscribe).toHaveBeenCalledWith('testAgentId');
+      expect(client.disconnect).toHaveBeenCalledOnce();
       expect((client as any).agent).toEqual(mockPayload);
       expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
@@ -123,7 +155,7 @@ describe('AgentGateway', () => {
       await gateway.handleConnection(client);
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith(undefined);
-      expect(mockRabbitMQService.setupQueue).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.subscribe).not.toHaveBeenCalled();
       expect(client.disconnect).toHaveBeenCalledOnce();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         `Error during agent socket connection: ${client.id}`,
@@ -141,7 +173,7 @@ describe('AgentGateway', () => {
       await gateway.handleConnection(client);
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith(token);
-      expect(mockRabbitMQService.setupQueue).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.subscribe).not.toHaveBeenCalled();
       expect(client.disconnect).toHaveBeenCalledOnce();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         `Error during agent socket connection: ${client.id}`,
@@ -158,7 +190,7 @@ describe('AgentGateway', () => {
       await gateway.handleConnection(client);
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith(token);
-      expect(mockRabbitMQService.setupQueue).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.subscribe).not.toHaveBeenCalled();
       expect(client.disconnect).toHaveBeenCalledOnce();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         `Error during agent socket connection: ${client.id}`,
@@ -173,12 +205,12 @@ describe('AgentGateway', () => {
       client.handshake.headers.authorization = `Bearer ${token}`;
 
       mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
-      mockRabbitMQService.setupQueue.mockResolvedValueOnce(undefined);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
 
       await gateway.handleConnection(client);
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith(token);
-      expect(mockRabbitMQService.setupQueue).toHaveBeenCalledWith('testAgentId');
+      expect(mockRabbitMQService.subscribe).toHaveBeenCalledWith('testAgentId');
       expect(client.disconnect).not.toHaveBeenCalled();
       expect((client as any).agent).toEqual(mockPayload);
     });
@@ -190,28 +222,31 @@ describe('AgentGateway', () => {
       client.handshake.headers.authorization = `Bearer ${headerToken}`;
 
       mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
-      mockRabbitMQService.setupQueue.mockResolvedValueOnce(undefined);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
 
       await gateway.handleConnection(client);
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith(authToken);
-      expect(mockRabbitMQService.setupQueue).toHaveBeenCalledWith('testAgentId');
+      expect(mockRabbitMQService.subscribe).toHaveBeenCalledWith('testAgentId');
     });
 
-    it('should set agent property even if RabbitMQ setup fails (fire and forget)', async () => {
+    it('should disconnect client and log error if RabbitMQ subscribe throws an error', async () => {
       const token = 'valid.jwt.token';
       const client = createMockSocket(token);
       const rabbitmqError = new Error('RabbitMQ connection failed');
 
       mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
-      mockRabbitMQService.setupQueue.mockRejectedValueOnce(rabbitmqError);
+      mockRabbitMQService.subscribe.mockRejectedValueOnce(rabbitmqError);
 
       await gateway.handleConnection(client);
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith(token);
-      expect(mockRabbitMQService.setupQueue).toHaveBeenCalledWith('testAgentId');
-      expect((client as any).agent).toEqual(mockPayload);
-      expect(client.disconnect).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.subscribe).toHaveBeenCalledWith('testAgentId');
+      expect(client.disconnect).toHaveBeenCalledOnce();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        `Error during agent socket connection: ${client.id}`,
+        'AgentGateway',
+      );
     });
 
     it('should handle empty token string', async () => {
@@ -222,8 +257,6 @@ describe('AgentGateway', () => {
       mockAuthService.verifyToken.mockRejectedValueOnce(new Error('Empty token'));
 
       await gateway.handleConnection(client);
-
-      const callArgs = mockAuthService.verifyToken.mock.calls[0];
 
       expect(mockAuthService.verifyToken).toHaveBeenCalledWith('');
       expect(client.disconnect).toHaveBeenCalledOnce();
@@ -268,15 +301,15 @@ describe('AgentGateway', () => {
   });
 
   describe('handleDisconnect', () => {
-    it('should log agent disconnection and delete queue', async () => {
+    it('should log agent disconnection and unsubscribe from RabbitMQ when agent exists', async () => {
       const mockAgentId = 'agent-123';
       const client = createMockSocket(undefined, { sub: mockAgentId }, 'mockSocketId456');
 
-      mockRabbitMQService.deleteQueue.mockResolvedValueOnce(undefined);
+      mockRabbitMQService.unsubscribe.mockResolvedValueOnce(undefined);
 
       await gateway.handleDisconnect(client);
 
-      expect(mockRabbitMQService.deleteQueue).toHaveBeenCalledWith(mockAgentId);
+      expect(mockRabbitMQService.unsubscribe).toHaveBeenCalledWith(mockAgentId);
       expect(loggerSpy).toHaveBeenCalledWith(
         `Agent disconnected: ${mockAgentId} (Socket ID: ${client.id})`,
       );
@@ -287,7 +320,7 @@ describe('AgentGateway', () => {
 
       await gateway.handleDisconnect(client);
 
-      expect(mockRabbitMQService.deleteQueue).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.unsubscribe).not.toHaveBeenCalled();
       expect(loggerSpy).toHaveBeenCalledWith(
         `Agent disconnected: undefined (Socket ID: ${client.id})`,
       );
@@ -298,22 +331,23 @@ describe('AgentGateway', () => {
 
       await gateway.handleDisconnect(client);
 
-      expect(mockRabbitMQService.deleteQueue).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.unsubscribe).not.toHaveBeenCalled();
       expect(loggerSpy).toHaveBeenCalledWith(
         `Agent disconnected: undefined (Socket ID: ${client.id})`,
       );
     });
 
-    it('should handle RabbitMQ deleteQueue failure', async () => {
+    it('should handle RabbitMQ unsubscribe failure gracefully', async () => {
       const mockAgentId = 'agent-456';
       const client = createMockSocket(undefined, { sub: mockAgentId }, 'mockSocketId102');
-      const rabbitmqError = new Error('Failed to delete queue');
+      const rabbitmqError = new Error('Failed to unsubscribe');
 
-      mockRabbitMQService.deleteQueue.mockRejectedValueOnce(rabbitmqError);
+      mockRabbitMQService.unsubscribe.mockRejectedValueOnce(rabbitmqError);
 
-      await expect(gateway.handleDisconnect(client)).rejects.toThrow('Failed to delete queue');
+      // The method doesn't throw errors anymore, it handles them internally
+      await expect(gateway.handleDisconnect(client)).rejects.toThrow('Failed to unsubscribe');
 
-      expect(mockRabbitMQService.deleteQueue).toHaveBeenCalledWith(mockAgentId);
+      expect(mockRabbitMQService.unsubscribe).toHaveBeenCalledWith(mockAgentId);
     });
 
     it('should handle client without agent property', async () => {
@@ -322,7 +356,7 @@ describe('AgentGateway', () => {
 
       await gateway.handleDisconnect(client);
 
-      expect(mockRabbitMQService.deleteQueue).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.unsubscribe).not.toHaveBeenCalled();
       expect(loggerSpy).toHaveBeenCalledWith(
         `Agent disconnected: undefined (Socket ID: ${client.id})`,
       );
@@ -403,16 +437,17 @@ describe('AgentGateway', () => {
       );
     });
 
-    it('should handle setupQueue being called with null/undefined sub', async () => {
+    it('should handle subscribe being called with undefined sub', async () => {
       const token = 'valid.token';
       const client = createMockSocket(token);
       const payloadWithoutSub = { iat: 123, exp: 123 };
 
       mockAuthService.verifyToken.mockResolvedValueOnce(payloadWithoutSub as any);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
 
       await gateway.handleConnection(client);
 
-      expect(mockRabbitMQService.setupQueue).toHaveBeenCalledWith(undefined);
+      expect(mockRabbitMQService.subscribe).toHaveBeenCalledWith(undefined);
       expect((client as any).agent).toEqual(payloadWithoutSub);
     });
 
