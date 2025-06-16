@@ -46,10 +46,17 @@ export class RabbitMQService implements OnModuleInit {
 
     this._connection.on('close', () => this.onClose());
     this._connection.on('error', (error: Error) => {
+      this.logger.error(error);
       this.logger.error(`RabbitMQ connection error: ${error.message}`);
     });
 
     this._channel = await this._connection.createChannel();
+
+    this._channel.on('error', (error: Error) => {
+      this.logger.error(error);
+      this.logger.error(`RabbitMQ chanel error: ${error.message}`);
+    });
+
     this.logger.log('RabbitMQ connected');
   }
 
@@ -85,16 +92,13 @@ export class RabbitMQService implements OnModuleInit {
     try {
       const dlqName = this.getDLQName(queueName);
 
-      const alreadyExist = await this.checkQueue(queueName);
-
-      if (alreadyExist) {
-        return true;
-      }
-
       // Create DLQ for our queue
       await this._channel.assertQueue(dlqName, {
         durable: true,
-        arguments: { 'x-queue-type': 'quorum', 'x-message-ttl': this.rabbitMQConfig.dlqTTL },
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': this.rabbitMQConfig.dlqTTL,
+        },
       });
 
       // Create and setup our queue
@@ -144,6 +148,7 @@ export class RabbitMQService implements OnModuleInit {
     }
   }
 
+  // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
     try {
       await this._channel.checkQueue(queueName);

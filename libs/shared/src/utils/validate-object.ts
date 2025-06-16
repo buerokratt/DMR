@@ -7,8 +7,6 @@ export const validateObject = <Data>(data: Data, rules: Joi.PartialSchemaMap<Dat
   const { error, value: values } = objectSchema.validate(data, { abortEarly: false });
 
   if (error) {
-    console.log(data);
-
     console.error('Config validation error(s):');
 
     error.details.forEach((detail) => {

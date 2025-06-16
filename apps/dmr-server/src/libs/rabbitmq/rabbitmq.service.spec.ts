@@ -9,14 +9,14 @@ vi.mock('amqplib', async () => {
   const checkQueueMock = vi.fn();
   const assertQueueMock = vi.fn();
   const deleteQueueMock = vi.fn();
+  const onMock = vi.fn();
 
   const createChannelMock = vi.fn().mockResolvedValue({
+    on: onMock,
     checkQueue: checkQueueMock,
     assertQueue: assertQueueMock,
     deleteQueue: deleteQueueMock,
   });
-
-  const onMock = vi.fn();
 
   const connectMock = vi.fn().mockResolvedValue({
     on: onMock,
