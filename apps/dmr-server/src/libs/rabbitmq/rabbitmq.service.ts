@@ -1,10 +1,12 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as rabbit from 'amqplib';
 import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
+import { ConsumeMessage } from 'amqplib';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
-export class RabbitMQService implements OnModuleInit {
+export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   private _connection: rabbit.ChannelModel;
   private _channel: rabbit.Channel;
 
@@ -15,6 +17,7 @@ export class RabbitMQService implements OnModuleInit {
     @Inject(rabbitMQConfig.KEY)
     private readonly rabbitMQConfig: RabbitMQConfig,
     private readonly schedulerRegistry: SchedulerRegistry,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -152,6 +155,70 @@ export class RabbitMQService implements OnModuleInit {
     } catch {
       return false;
     }
+  }
+
+  async subscribe(queueName: string): Promise<boolean> {
+    try {
+      const queueExists = await this.checkQueue(queueName);
+
+      if (!queueExists) {
+        this.logger.error('Queue does not exist:', queueName);
+
+        return false;
+      }
+
+      const consume = await this._channel.consume(
+        queueName,
+        (message: ConsumeMessage): void => {
+          try {
+            const messageContent = message.content.toString();
+
+            this.logger.debug(`Processing message from queue ${queueName}:`, messageContent);
+          } catch (error) {
+            this.logger.error(`Error processing message from queue ${queueName}:`, error);
+          }
+        },
+        { noAck: false },
+      );
+
+      const consumeTagKey = this.getConsumeTagKey(queueName);
+      await this.cacheManager.set(consumeTagKey, consume.consumerTag);
+
+      return true;
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logger.error(`Error subscribing to queue ${queueName}: ${error.message}`);
+      }
+      return false;
+    }
+  }
+
+  async unsubscribe(queueName: string): Promise<boolean> {
+    const consumeTagKey = this.getConsumeTagKey(queueName);
+
+    try {
+      const consumerTag = await this.cacheManager.get<string | null>(consumeTagKey);
+
+      if (!consumerTag) {
+        this.logger.warn(`No active consumer found for queue ${queueName}`);
+        return false;
+      }
+
+      await this._channel.cancel(consumerTag);
+      await this.cacheManager.del(consumeTagKey);
+
+      this.logger.log(`Unsubscribed from queue ${queueName}`);
+      return true;
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logger.error(`Error unsubscribing from queue ${queueName}: ${error.message}`);
+      }
+      return false;
+    }
+  }
+
+  private getConsumeTagKey(queueName: string): string {
+    return `consumeTag:${queueName}`;
   }
 
   private getDLQName(queueName: string): string {
