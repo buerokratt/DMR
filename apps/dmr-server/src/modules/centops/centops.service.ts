@@ -6,7 +6,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
 
-import { ClientConfigDto, ICentOpsResponse, Utils } from '@dmr/shared';
+import { ClientConfigDto, IGetAgentConfigListResponse, Utils } from '@dmr/shared';
 import { CronJob } from 'cron';
 import { CentOpsConfig, centOpsConfig } from '../../common/config';
 import { RabbitMQService } from '../../libs/rabbitmq';
@@ -49,7 +49,7 @@ export class CentOpsService implements OnModuleInit {
   async syncConfiguration(): Promise<ClientConfigDto[] | undefined> {
     try {
       const { data } = await firstValueFrom(
-        this.httpService.get<ICentOpsResponse>(this.centOpsConfig.url),
+        this.httpService.get<IGetAgentConfigListResponse>(this.centOpsConfig.url),
       );
 
       const configurations =
