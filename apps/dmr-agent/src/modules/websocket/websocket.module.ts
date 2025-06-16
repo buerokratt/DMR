@@ -1,18 +1,17 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from './websocket.service';
 
 @Module({
   imports: [
     JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      inject: [agentConfig.KEY],
+      useFactory: (agentConfig: AgentConfig) => ({
         signOptions: {
           algorithm: 'RS256',
           expiresIn: '1m',
-          keyid: configService.get<string>('AGENT_ID'),
+          keyid: agentConfig.uuid,
         },
       }),
     }),

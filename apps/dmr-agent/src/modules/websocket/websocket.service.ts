@@ -26,8 +26,8 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   private connectToServer(): void {
     try {
       const socketOptions: Partial<ManagerOptions & SocketOptions> = {
-        reconnectionDelay: this.webSocketConfig.reconnectionDelay.min,
-        reconnectionDelayMax: this.webSocketConfig.reconnectionDelay.max,
+        reconnectionDelay: this.webSocketConfig.reconnectionDelayMin,
+        reconnectionDelayMax: this.webSocketConfig.reconnectionDelayMax,
         auth: {
           token: this.generateJwtToken(this.agentConfig.uuid, this.agentConfig.privateKey),
         },

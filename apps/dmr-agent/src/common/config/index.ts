@@ -1,4 +1,7 @@
+export * from './agent.config';
 export * from './app.config';
+export * from './dmr-server.config';
+export * from './web-socket.config';
 
 import { AGENT_CONFIG_TOKEN, agentConfig, AgentConfig } from './agent.config';
 import { APP_CONFIG_TOKEN, appConfig, AppConfig } from './app.config';
