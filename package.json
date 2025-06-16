@@ -45,6 +45,7 @@
     "compression": "^1.8.0",
     "cron": "4.3.0",
     "joi": "^17.13.3",
+    "jose": "^6.0.11",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
     "socket.io-client": "^4.8.1"
