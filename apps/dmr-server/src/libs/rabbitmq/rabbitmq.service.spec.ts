@@ -160,11 +160,9 @@ describe('RabbitMQService', () => {
   });
 
   it('should setup queue and DLQ', async () => {
-    checkQueueMock.mockRejectedValueOnce(new Error('Not Found'));
     const result = await service.setupQueue('test-queue', 1000);
 
     expect(result).toBe(true);
-    expect(checkQueueMock).toHaveBeenCalledWith('test-queue');
     expect(assertQueueMock).toHaveBeenCalledWith('test-queue.dlq', {
       durable: true,
       arguments: { 'x-queue-type': 'quorum', 'x-message-ttl': 60000 },

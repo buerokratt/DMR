@@ -109,7 +109,7 @@ export class CentOpsService implements OnModuleInit {
         newConfigurations.push(clientConfig);
       }
 
-      for (const deletedConfiguration of configurations.values()) {
+      for (const deletedConfiguration of Object.values(configurationsMap)) {
         await this.rabbitMQService.deleteQueue(deletedConfiguration.id);
       }
 

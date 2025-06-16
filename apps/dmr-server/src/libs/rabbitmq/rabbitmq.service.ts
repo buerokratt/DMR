@@ -88,12 +88,6 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     try {
       const dlqName = this.getDLQName(queueName);
 
-      const alreadyExist = await this.checkQueue(queueName);
-
-      if (alreadyExist) {
-        return true;
-      }
-
       // Create DLQ for our queue
       await this._channel.assertQueue(dlqName, {
         durable: true,
