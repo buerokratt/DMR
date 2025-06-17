@@ -5,13 +5,13 @@ import { resolve } from 'path';
 export default defineConfig({
   test: {
     globals: true,
-    root: './',
+    root: './apps/dmr-server',
     coverage: {
       exclude: [...configDefaults.exclude, 'src/main.ts', '**/*.module.ts'],
     },
     // Allow importing from shared libs
     alias: {
-      '@dmr/shared': resolve(__dirname, './libs/shared/src'),
+      '@dmr/shared': resolve(__dirname, '../../libs/shared/src'),
     },
   },
   plugins: [

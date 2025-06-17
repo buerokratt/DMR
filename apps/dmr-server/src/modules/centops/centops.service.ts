@@ -109,15 +109,19 @@ export class CentOpsService implements OnModuleInit {
         newConfigurations.push(clientConfig);
       }
 
-      for (const deletedConfiguration of Object.values(configurationsMap)) {
-        await this.rabbitMQService.deleteQueue(deletedConfiguration.id);
+      const checkDuplicates = [...new Set([...newConfigurations, ...configurations])];
+
+      if (checkDuplicates.length !== 0) {
+        for (const deletedConfiguration of Object.values(configurationsMap)) {
+          await this.rabbitMQService.deleteQueue(deletedConfiguration.id);
+        }
+
+        await this.cacheManager.set(this.CENT_OPS_CONFIG_CACHE_KEY, newConfigurations);
+
+        this.logger.log('CentOps configuration updated and stored in memory.');
+
+        return newConfigurations;
       }
-
-      await this.cacheManager.set(this.CENT_OPS_CONFIG_CACHE_KEY, newConfigurations);
-
-      this.logger.log('CentOps configuration updated and stored in memory.');
-
-      return newConfigurations;
     } catch (error: unknown) {
       if (error instanceof Error) {
         this.logger.error(

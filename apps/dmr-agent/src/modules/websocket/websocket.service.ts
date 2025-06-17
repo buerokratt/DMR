@@ -2,7 +2,7 @@ import { JwtPayload } from '@dmr/shared';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { io, Socket, ManagerOptions, SocketOptions } from 'socket.io-client';
+import { io, ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 
 @Injectable()
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
@@ -127,6 +127,10 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
 
   isConnected(): boolean {
     return Boolean(this.socket?.connected);
+  }
+
+  getSocket(): Socket | null {
+    return this.socket;
   }
 
   onModuleDestroy(): void {
