@@ -1,7 +1,7 @@
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 import { rabbitMQConfig } from '../../common/config';
 import { RabbitMQService } from './rabbitmq.service';
@@ -64,7 +64,7 @@ const {
 describe('RabbitMQService', () => {
   let service: RabbitMQService;
   let schedulerRegistry: SchedulerRegistry;
-  let cacheManager: any;
+  let cacheManager: Cache;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -101,7 +101,7 @@ describe('RabbitMQService', () => {
 
     service = module.get<RabbitMQService>(RabbitMQService);
     schedulerRegistry = module.get<SchedulerRegistry>(SchedulerRegistry);
-    cacheManager = module.get<Cache>(CACHE_MANAGER);
+    cacheManager = module.get(CACHE_MANAGER);
 
     await service.onModuleInit();
   });
@@ -220,7 +220,7 @@ describe('RabbitMQService', () => {
     const testQueue = 'test-unsubscribe-queue';
     const mockConsumerTag = 'consumer-tag-456';
 
-    cacheManager.get.mockResolvedValue(mockConsumerTag);
+    vi.spyOn(cacheManager, 'get').mockResolvedValue(mockConsumerTag);
 
     const result = await service.unsubscribe(testQueue);
 
@@ -232,7 +232,8 @@ describe('RabbitMQService', () => {
 
   it('should return false if no consumer tag is found for unsubscribe', async () => {
     const testQueue = 'test-unsubscribe-queue-no-tag';
-    cacheManager.get.mockResolvedValue(null);
+
+    vi.spyOn(cacheManager, 'get').mockResolvedValue(null);
 
     const result = await service.unsubscribe(testQueue);
 

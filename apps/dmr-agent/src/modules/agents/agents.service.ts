@@ -1,9 +1,19 @@
-import { AgentDto, AgentEventNames, IAgent, IAgentList } from '@dmr/shared';
+import {
+  AgentDto,
+  AgentEventNames,
+  AgentMessageDto,
+  ExternalServiceMessageDto,
+  IAgent,
+  IAgentList,
+  MessageType,
+  Utils,
+} from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
@@ -12,7 +22,8 @@ export class AgentsService implements OnModuleInit {
   private readonly logger = new Logger(AgentsService.name);
 
   constructor(
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly websocketService: WebsocketService,
   ) {}
 
@@ -117,6 +128,36 @@ export class AgentsService implements OnModuleInit {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error getting agent by ID: ${errorMessage}`);
+      return null;
+    }
+  }
+
+  async encryptMessagePayloadFromExternalService(
+    message: ExternalServiceMessageDto,
+  ): Promise<AgentMessageDto | null> {
+    try {
+      const uuid = crypto.randomUUID();
+      const recipient = await this.getAgentById(message.recipientId);
+
+      const encryptedPayload = await Utils.encryptPayload(
+        message.payload,
+        this.agentConfig.privateKey,
+        recipient.authenticationCertificate,
+      );
+
+      const newMessage: AgentMessageDto = {
+        id: uuid,
+        type: MessageType.Message,
+        payload: encryptedPayload,
+        recipientId: recipient.id,
+        senderId: this.agentConfig.uuid,
+        timestamp: new Date().toISOString(),
+      };
+
+      return newMessage;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.error(`Error encrypting message: ${errorMessage}`);
       return null;
     }
   }

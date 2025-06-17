@@ -53,7 +53,14 @@ describe('AgentsService', () => {
     vi.spyOn(classTransformer, 'plainToInstance').mockImplementation((_, obj) => obj as any);
     vi.spyOn(classValidator, 'validate').mockResolvedValue([]); // Assume always valid
 
-    service = new AgentsService(mockCacheManager as any, mockWebsocketService);
+    service = new AgentsService(
+      {
+        uuid: 'test-agent',
+        privateKey: 'test-private-key',
+      },
+      mockCacheManager as any,
+      mockWebsocketService,
+    );
   });
 
   it('should call setupSocketEventListeners on module init', () => {
