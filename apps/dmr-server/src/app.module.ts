@@ -8,6 +8,7 @@ import { RabbitMQModule } from './libs/rabbitmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule } from '@nestjs/cache-manager';
 import { HttpModule } from '@nestjs/axios';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { HttpModule } from '@nestjs/axios';
       isGlobal: true,
     }),
     HttpModule.register({ global: true }),
+    EventEmitterModule.forRoot({ global: true }),
     HealthModule,
     RabbitMQModule,
     CentOpsModule,
