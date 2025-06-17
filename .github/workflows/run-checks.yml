@@ -22,7 +22,7 @@ jobs:
           - name: lint
             command: npx nx run-many --target=lint:check --all
           - name: test
-            command: npx nx run-many --target=test --all
+            command: npx nx run-many --target=test --all -- --reporter=verbose
           - name: test-e2e
             command: npx nx run-many --target=test:e2e --all
     name: ${{ matrix.name }}
