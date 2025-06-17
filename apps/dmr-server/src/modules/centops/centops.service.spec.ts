@@ -8,12 +8,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CentOpsService } from './centops.service';
 import { centOpsConfig } from '../../common/config';
 import { RabbitMQService } from '../../libs/rabbitmq';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CentOpsEvent } from '@dmr/shared';
 
 describe('CentOpsService', () => {
   let service: CentOpsService;
   let httpService: HttpService;
   let cacheManager: Cache;
   let schedulerRegistry: SchedulerRegistry;
+  let eventEmitter: EventEmitter2;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,6 +45,10 @@ describe('CentOpsService', () => {
           provide: SchedulerRegistry,
           useValue: { addCronJob: vi.fn() },
         },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: vi.fn() },
+        },
       ],
     }).compile();
 
@@ -49,6 +56,7 @@ describe('CentOpsService', () => {
     httpService = module.get<HttpService>(HttpService);
     service = module.get<CentOpsService>(CentOpsService);
     schedulerRegistry = module.get<SchedulerRegistry>(SchedulerRegistry);
+    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
   });
 
   it('should be defined', () => {
@@ -74,9 +82,11 @@ describe('CentOpsService', () => {
         },
       ],
     };
+
     vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
-    vi.spyOn(cacheManager, 'get').mockResolvedValue(mockData.response);
+    vi.spyOn(cacheManager, 'get').mockResolvedValue([]); // assume cache is initially empty
     vi.spyOn(cacheManager, 'set').mockResolvedValue(true);
+    vi.spyOn(eventEmitter, 'emit');
 
     const response = await service.syncConfiguration();
 
@@ -84,6 +94,7 @@ describe('CentOpsService', () => {
     expect(httpService.get).toHaveBeenCalledWith('http://test-url');
     expect(cacheManager.get).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION');
     expect(cacheManager.set).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION', expect.any(Array));
+    expect(eventEmitter.emit).toHaveBeenCalledWith(CentOpsEvent.UPDATED, expect.any(Object));
   });
 
   it('should log error if validation fails', async () => {
@@ -99,7 +110,7 @@ describe('CentOpsService', () => {
       ],
     };
     vi.spyOn(httpService, 'get').mockReturnValueOnce(of({ data: mockData } as any));
-    vi.spyOn(cacheManager, 'get').mockResolvedValue(mockData.response);
+    vi.spyOn(cacheManager, 'get').mockResolvedValue([]);
     const loggerErrorSpy = vi.spyOn((service as any).logger, 'error');
 
     const response = await service.syncConfiguration();
