@@ -10,9 +10,11 @@ const variables = Utils.validateObject(
   {
     port: Number(process.env.PORT),
     environment: process.env.ENVIRONMENT as Environment,
+    websocketMaxDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION),
   },
   {
     port: Joi.number().default(5000),
+    websocketMaxDuration: Joi.number().default(120000),
     environment: Joi.string().valid('development', 'production').default('development'),
   },
 );

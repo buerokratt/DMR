@@ -1,6 +1,7 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 import { rabbitMQConfig } from '../../common/config';
 import { RabbitMQService } from './rabbitmq.service';
@@ -10,17 +11,26 @@ vi.mock('amqplib', async () => {
   const assertQueueMock = vi.fn();
   const deleteQueueMock = vi.fn();
   const onMock = vi.fn();
+  const consumeMock = vi.fn();
+  const cancelMock = vi.fn();
 
   const createChannelMock = vi.fn().mockResolvedValue({
     on: onMock,
     checkQueue: checkQueueMock,
     assertQueue: assertQueueMock,
     deleteQueue: deleteQueueMock,
+    consume: consumeMock,
+    cancel: cancelMock,
   });
+
+  const closeConnectionMock = vi.fn();
+  const removeAllListenersConnectionMock = vi.fn();
 
   const connectMock = vi.fn().mockResolvedValue({
     on: onMock,
     createChannel: createChannelMock,
+    close: closeConnectionMock,
+    removeAllListeners: removeAllListenersConnectionMock,
   });
 
   return {
@@ -32,18 +42,33 @@ vi.mock('amqplib', async () => {
       assertQueueMock,
       deleteQueueMock,
       checkQueueMock,
+      consumeMock,
+      cancelMock,
+      closeConnectionMock,
+      removeAllListenersConnectionMock,
     },
   };
 });
 
 import * as amqplib from 'amqplib';
-const { assertQueueMock, deleteQueueMock, checkQueueMock } = (amqplib as any).__mocks;
+const {
+  assertQueueMock,
+  deleteQueueMock,
+  checkQueueMock,
+  consumeMock,
+  cancelMock,
+  closeConnectionMock,
+  removeAllListenersConnectionMock,
+} = (amqplib as any).__mocks;
 
 describe('RabbitMQService', () => {
   let service: RabbitMQService;
   let schedulerRegistry: SchedulerRegistry;
+  let cacheManager: any;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RabbitMQService,
@@ -63,11 +88,20 @@ describe('RabbitMQService', () => {
           provide: SchedulerRegistry,
           useValue: { addInterval: vi.fn(), deleteInterval: vi.fn(), doesExist: vi.fn() },
         },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: vi.fn(),
+            set: vi.fn(),
+            del: vi.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<RabbitMQService>(RabbitMQService);
     schedulerRegistry = module.get<SchedulerRegistry>(SchedulerRegistry);
+    cacheManager = module.get<Cache>(CACHE_MANAGER);
 
     await service.onModuleInit();
   });
@@ -111,19 +145,19 @@ describe('RabbitMQService', () => {
   });
 
   it('should return true if queue exists', async () => {
-    const checkQueue = checkQueueMock.mockResolvedValue(true);
+    checkQueueMock.mockResolvedValueOnce(true);
     const result = await service.checkQueue('test-queue');
 
     expect(result).toBe(true);
-    expect(checkQueue).toHaveBeenCalledWith('test-queue');
+    expect(checkQueueMock).toHaveBeenCalledWith('test-queue');
   });
 
   it('should return false if queue does not exist', async () => {
-    const checkQueue = checkQueueMock.mockRejectedValueOnce(new Error('Not Found'));
+    checkQueueMock.mockRejectedValueOnce(new Error('Not Found'));
     const result = await service.checkQueue('test-queue');
 
     expect(result).toBe(false);
-    expect(checkQueue).toHaveBeenCalledWith('test-queue');
+    expect(checkQueueMock).toHaveBeenCalledWith('test-queue');
   });
 
   it('should setup queue and DLQ', async () => {
@@ -155,5 +189,63 @@ describe('RabbitMQService', () => {
     expect(result).toBe(true);
     expect(deleteQueueMock).toHaveBeenCalledWith('test-queue.dlq');
     expect(deleteQueueMock).toHaveBeenCalledWith('test-queue');
+  });
+
+  it('should subscribe to a queue and store consumer tag', async () => {
+    const testQueue = 'test-subscribe-queue';
+    const mockConsumerTag = 'consumer-tag-123';
+
+    vi.spyOn(service, 'checkQueue').mockResolvedValue(true);
+    consumeMock.mockResolvedValue({ consumerTag: mockConsumerTag });
+
+    const result = await service.subscribe(testQueue);
+
+    expect(result).toBe(true);
+    expect(consumeMock).toHaveBeenCalledWith(testQueue, expect.any(Function), { noAck: false });
+    expect(cacheManager.set).toHaveBeenCalledWith(`consumeTag:${testQueue}`, mockConsumerTag);
+  });
+
+  it('should return false if queue does not exist for subscribe', async () => {
+    const testQueue = 'non-existent-queue';
+    vi.spyOn(service, 'checkQueue').mockResolvedValue(false);
+
+    const result = await service.subscribe(testQueue);
+
+    expect(result).toBe(false);
+    expect(consumeMock).not.toHaveBeenCalled();
+    expect(cacheManager.set).not.toHaveBeenCalled();
+  });
+
+  it('should unsubscribe from a queue and remove consumer tag', async () => {
+    const testQueue = 'test-unsubscribe-queue';
+    const mockConsumerTag = 'consumer-tag-456';
+
+    cacheManager.get.mockResolvedValue(mockConsumerTag);
+
+    const result = await service.unsubscribe(testQueue);
+
+    expect(result).toBe(true);
+    expect(cacheManager.get).toHaveBeenCalledWith(`consumeTag:${testQueue}`);
+    expect(cancelMock).toHaveBeenCalledWith(mockConsumerTag);
+    expect(cacheManager.del).toHaveBeenCalledWith(`consumeTag:${testQueue}`);
+  });
+
+  it('should return false if no consumer tag is found for unsubscribe', async () => {
+    const testQueue = 'test-unsubscribe-queue-no-tag';
+    cacheManager.get.mockResolvedValue(null);
+
+    const result = await service.unsubscribe(testQueue);
+
+    expect(result).toBe(false);
+    expect(cacheManager.get).toHaveBeenCalledWith(`consumeTag:${testQueue}`);
+    expect(cancelMock).not.toHaveBeenCalled();
+    expect(cacheManager.del).not.toHaveBeenCalled();
+  });
+
+  it('should call removeAllListeners and close on module destroy', async () => {
+    await service.onModuleDestroy();
+
+    expect(removeAllListenersConnectionMock).toHaveBeenCalled();
+    expect(closeConnectionMock).toHaveBeenCalled();
   });
 });

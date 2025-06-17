@@ -1,3 +1,4 @@
+import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { configs } from './config';
@@ -14,6 +15,9 @@ import { configs } from './config';
         allowUnknown: true,
         abortEarly: true,
       },
+    }),
+    CacheModule.register({
+      isGlobal: true,
     }),
   ],
 })

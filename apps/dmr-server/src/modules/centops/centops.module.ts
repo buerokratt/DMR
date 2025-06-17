@@ -6,5 +6,6 @@ import { RabbitMQModule } from '../../libs/rabbitmq';
 @Module({
   imports: [RabbitMQModule],
   providers: [CentOpsService],
+  exports: [CentOpsService],
 })
 export class CentOpsModule {}

@@ -8,7 +8,7 @@ export const handlers = [
           id: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
           name: 'Police',
           authentication_certificate:
-            '-----BEGIN CERTIFICATE-----\nMIID...==\n-----END CERTIFICATE-----',
+            process.env.MOCK_DMR_AGENT_A_PUBLIC_KEY || 'MOCK_DMR_AGENT_A_PUBLIC_KEY not set',
           created_at: '2025-06-10T12:34:56Z',
           updated_at: '2025-06-10T12:34:56Z',
         },
@@ -16,7 +16,7 @@ export const handlers = [
           id: 'a1e45678-12bc-4ef0-9876-def123456789',
           name: 'Tax office',
           authentication_certificate:
-            '-----BEGIN CERTIFICATE-----\nABCD...==\n-----END CERTIFICATE-----',
+            process.env.MOCK_DMR_AGENT_B_PUBLIC_KEY || 'MOCK_DMR_AGENT_B_PUBLIC_KEY not set',
           created_at: '2025-06-08T08:22:10Z',
           updated_at: '2025-06-09T09:13:44Z',
         },
