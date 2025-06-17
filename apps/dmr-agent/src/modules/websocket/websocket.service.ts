@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { io, ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 import { AgentConfig, agentConfig } from '../../common/config/agent.config';
 import { DMRServerConfig, dmrServerConfig } from '../../common/config/dmr-server.config';
-import { WebSocketConfig } from '../../common/config/web-socket.config';
+import { webSocketConfig, WebSocketConfig } from '../../common/config/web-socket.config';
 
 @Injectable()
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
@@ -15,7 +15,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
     @Inject(dmrServerConfig.KEY) private readonly dmrServerConfig: DMRServerConfig,
-    @Inject(dmrServerConfig.KEY) private readonly webSocketConfig: WebSocketConfig,
+    @Inject(webSocketConfig.KEY) private readonly webSocketConfig: WebSocketConfig,
     private readonly jwtService: JwtService,
   ) {}
 
