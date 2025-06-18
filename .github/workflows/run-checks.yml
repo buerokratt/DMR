@@ -39,7 +39,7 @@ jobs:
       - name: Use env for agent
         if: matrix.name == 'test-agent'
         run: cp apps/dmr-agent/.env.example apps/dmr-agent/.env
-        
+
       - run: ${{ matrix.command }}
 
   build:
