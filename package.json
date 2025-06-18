@@ -16,6 +16,8 @@
     "test": "nx run-many --target=test --all",
     "test:server": "nx test dmr-server",
     "test:agent": "nx test dmr-agent",
+    "test:server:log": "nx test dmr-server -- --reporter=verbose",
+    "test:agent:log": "nx test dmr-agent -- --reporter=verbose",
     "e2e": "nx run-many --target=e2e --all",
     "e2e:server": "nx e2e dmr-server ",
     "e2e:agent": "nx e2e dmr-agent",

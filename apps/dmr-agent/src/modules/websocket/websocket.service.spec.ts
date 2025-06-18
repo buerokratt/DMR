@@ -30,7 +30,7 @@ describe('WebsocketService', () => {
         {
           provide: agentConfig.KEY,
           useValue: {
-            uuid: 'test-agent',
+            id: 'test-agent',
             privateKey: 'test-private-key',
           },
         },
