@@ -1,7 +1,8 @@
 import {
+  AgentDecryptedMessageDto,
   AgentDto,
+  AgentEncryptedMessageDto,
   AgentEventNames,
-  AgentMessageDto,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
@@ -54,6 +55,10 @@ export class AgentsService implements OnModuleInit {
 
     socket.on(AgentEventNames.PARTIAL_AGENT_LIST, (data: IAgentList) => {
       void this.handlePartialAgentListEvent(data);
+    });
+
+    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentEncryptedMessageDto) => {
+      void this.handleMessageFromDMRServerEvent(data);
     });
   }
 
@@ -121,6 +126,22 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
+  private async handleMessageFromDMRServerEvent(message: AgentEncryptedMessageDto): Promise<void> {
+    try {
+      const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
+
+      if (!decryptedMessage) {
+        this.logger.error(`Something went wrong while decrypting the message`);
+        return;
+      }
+
+      this.logger.log('Message is decrypted');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
+    }
+  }
+
   async getAgentById(id: string): Promise<IAgent | null> {
     try {
       const agents: IAgent[] = (await this.cacheManager.get<IAgent[]>(this.AGENTS_CACHE_KEY)) ?? [];
@@ -134,7 +155,7 @@ export class AgentsService implements OnModuleInit {
 
   async encryptMessagePayloadFromExternalService(
     message: ExternalServiceMessageDto,
-  ): Promise<AgentMessageDto | null> {
+  ): Promise<AgentEncryptedMessageDto | null> {
     try {
       const uuid = crypto.randomUUID();
       const recipient = await this.getAgentById(message.recipientId);
@@ -145,7 +166,7 @@ export class AgentsService implements OnModuleInit {
         recipient.authenticationCertificate,
       );
 
-      const newMessage: AgentMessageDto = {
+      const encryptedMessage: AgentEncryptedMessageDto = {
         id: uuid,
         type: MessageType.Message,
         payload: encryptedPayload,
@@ -154,10 +175,39 @@ export class AgentsService implements OnModuleInit {
         timestamp: new Date().toISOString(),
       };
 
-      return newMessage;
+      return encryptedMessage;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error encrypting message: ${errorMessage}`);
+      return null;
+    }
+  }
+
+  async decryptMessagePayloadFromDMRServer(
+    message: AgentEncryptedMessageDto,
+  ): Promise<AgentDecryptedMessageDto | null> {
+    try {
+      const sender = await this.getAgentById(message.senderId);
+
+      const decryptedPayload = await Utils.decryptPayload(
+        message.payload,
+        sender.authenticationCertificate,
+        this.agentConfig.privateKey,
+      );
+
+      const decryptedMessage: AgentDecryptedMessageDto = {
+        id: message.id,
+        type: message.type,
+        payload: decryptedPayload.data,
+        recipientId: this.agentConfig.uuid,
+        senderId: sender.id,
+        timestamp: message.timestamp,
+      };
+
+      return decryptedMessage;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      this.logger.error(`Error decrypting message: ${errorMessage}`);
       return null;
     }
   }

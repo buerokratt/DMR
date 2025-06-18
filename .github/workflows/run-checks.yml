@@ -22,9 +22,9 @@ jobs:
           - name: lint
             command: npx nx run-many --target=lint:check --all
           - name: test-server
-            command: npx nx run dmr-server:test --reporter=verbose
+            command: npx nx run dmr-server:test
           - name: test-agent
-            command: npx nx run dmr-agent:test --reporter=verbose
+            command: npx nx run dmr-agent:test
           - name: test-e2e
             command: npx nx run-many --target=test:e2e --all
     name: ${{ matrix.name }}

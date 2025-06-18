@@ -1,7 +1,7 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsString, IsUUID } from 'class-validator';
 import { MessageType } from '../enums';
 
-export class AgentMessageDto {
+export class AgentEncryptedMessageDto {
   @IsUUID()
   @IsNotEmpty()
   id: string; // Message ID, for now, generate a UUID with crypto.randomUUID()
@@ -22,7 +22,6 @@ export class AgentMessageDto {
   @IsNotEmpty()
   payload: string;
 
-  @IsBoolean()
-  @IsOptional()
+  @IsEnum(MessageType)
   type: MessageType;
 }
