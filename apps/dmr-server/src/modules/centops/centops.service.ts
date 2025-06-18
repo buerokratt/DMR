@@ -53,7 +53,7 @@ export class CentOpsService implements OnModuleInit {
     return (await this.cacheManager.get<ClientConfigDto[]>(this.CENT_OPS_CONFIG_CACHE_KEY)) || [];
   }
 
-  async getCentOpsConfigurationByClientId(clientId: string): Promise<ClientConfigDto | null> {
+  async getCentOpsConfigurationByClientId(clientId: string): Promise<ClientConfigDto> {
     const centOpsConfigs =
       (await this.cacheManager.get<ClientConfigDto[]>(this.CENT_OPS_CONFIG_CACHE_KEY)) || [];
 

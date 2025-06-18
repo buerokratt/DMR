@@ -1,5 +1,12 @@
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as rabbit from 'amqplib';
 import { ConsumeMessage } from 'amqplib';
@@ -7,8 +14,8 @@ import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
-  private _connection: rabbit.ChannelModel;
-  private _channel: rabbit.Channel;
+  private _connection: rabbit.ChannelModel | null = null;
+  private _channel: rabbit.Channel | null = null;
 
   private readonly logger = new Logger(RabbitMQService.name);
   private readonly RECONNECT_INTERVAL_NAME = 'RECONNECT_INTERVAL_NAME';
@@ -90,6 +97,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   }
 
   async setupQueue(queueName: string, ttl?: number): Promise<boolean> {
+    if (!this._channel) {
+      throw new BadRequestException('Rabbit channel not defined');
+    }
+
     try {
       const dlqName = this.getDLQName(queueName);
 
@@ -128,6 +139,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   }
 
   async deleteQueue(queueName: string): Promise<boolean> {
+    if (!this._channel) {
+      throw new BadRequestException('Rabbit channel not defined');
+    }
+
     try {
       const dlqName = this.getDLQName(queueName);
 
@@ -151,6 +166,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
+    if (!this._channel) {
+      throw new BadRequestException('Rabbit channel not defined');
+    }
+
     try {
       await this._channel.checkQueue(queueName);
 
@@ -161,6 +180,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   }
 
   async subscribe(queueName: string): Promise<boolean> {
+    if (!this._channel) {
+      throw new BadRequestException('Rabbit channel not defined');
+    }
+
     try {
       const queueExists = await this.checkQueue(queueName);
 
@@ -172,9 +195,9 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
       const consume = await this._channel.consume(
         queueName,
-        (message: ConsumeMessage): void => {
+        (message: ConsumeMessage | null): void => {
           try {
-            const messageContent = message.content.toString();
+            const messageContent = message ? message.content.toString() : null;
 
             this.logger.debug(`Processing message from queue ${queueName}:`, messageContent);
           } catch (error) {
@@ -197,6 +220,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   }
 
   async unsubscribe(queueName: string): Promise<boolean> {
+    if (!this._channel) {
+      throw new BadRequestException('Rabbit channel not defined');
+    }
+
     const consumeTagKey = this.getConsumeTagKey(queueName);
 
     try {
@@ -228,11 +255,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     return `${queueName}.dlq`;
   }
 
-  get connection(): rabbit.ChannelModel {
+  get connection(): rabbit.ChannelModel | null {
     return this._connection;
   }
 
-  get channel(): rabbit.Channel {
+  get channel(): rabbit.Channel | null {
     return this._channel;
   }
 }
