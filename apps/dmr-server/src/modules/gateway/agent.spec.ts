@@ -276,7 +276,7 @@ describe('AgentGateway', () => {
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
 
-    it('should handle non‑Error thrown from verifyToken', async () => {
+    it('should handle non-Error thrown from verifyToken', async () => {
       const token = 'some.token';
       const client = createMockSocket(token);
       mockAuthService.verifyToken.mockRejectedValueOnce('string error');
