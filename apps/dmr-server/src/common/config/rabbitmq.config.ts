@@ -6,13 +6,14 @@ export const RABBITMQ_CONFIG_TOKEN = Symbol('RABBITMQ_CONFIG_TOKEN');
 
 const variables = Utils.validateObject(
   {
-    username: process.env.RABBITMQ_DEFAULT_USER ?? '',
-    password: process.env.RABBITMQ_DEFAULT_PASS ?? '',
-    ttl: Number(process.env.RABBITMQ_DEFAULT_TTL ?? 300000),
-    port: Number(process.env.RABBITMQ_DEFAULT_PORT ?? 5672),
-    hostname: process.env.RABBITMQ_DEFAULT_HOST ?? 'localhost',
-    dlqTTL: Number(process.env.RABBITMQ_DEFAULT_DLQ_TTL ?? 86400000),
-    reconnectInterval: Number(process.env.RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL ?? 5000),
+    username: process.env.RABBITMQ_DEFAULT_USER,
+    password: process.env.RABBITMQ_DEFAULT_PASS,
+    ttl: Number(process.env.RABBITMQ_DEFAULT_TTL),
+    port: Number(process.env.RABBITMQ_DEFAULT_PORT),
+    hostname: process.env.RABBITMQ_DEFAULT_HOST,
+    managementUIUri: process.env.RABBITMQ_DEFAULT_MANAGEMENT_UI_URI,
+    dlqTTL: Number(process.env.RABBITMQ_DEFAULT_DLQ_TTL),
+    reconnectInterval: Number(process.env.RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL),
   },
   {
     port: Joi.number().required(),
@@ -22,6 +23,7 @@ const variables = Utils.validateObject(
     dlqTTL: Joi.number().default(86400000),
     hostname: Joi.string().hostname().required(),
     reconnectInterval: Joi.number().default(5000),
+    managementUIUri: Joi.string().uri().required(),
   },
 );
 

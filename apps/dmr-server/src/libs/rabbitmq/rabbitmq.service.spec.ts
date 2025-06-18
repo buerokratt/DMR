@@ -50,6 +50,7 @@ vi.mock('amqplib', async () => {
   };
 });
 
+import { HttpService } from '@nestjs/axios';
 import * as amqplib from 'amqplib';
 const {
   assertQueueMock,
@@ -82,6 +83,7 @@ describe('RabbitMQService', () => {
             ttl: 60000,
             dlqTTL: 60000,
             reconnectInterval: 5000,
+            managementUIUri: 'http://localhost:15672',
           },
         },
         {
@@ -95,6 +97,10 @@ describe('RabbitMQService', () => {
             set: vi.fn(),
             del: vi.fn(),
           },
+        },
+        {
+          provide: HttpService,
+          useValue: { get: vi.fn() },
         },
       ],
     }).compile();

@@ -18,12 +18,12 @@ export class CentOpsService implements OnModuleInit {
   private readonly logger = new Logger(CentOpsService.name);
 
   constructor(
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(centOpsConfig.KEY)
     private readonly centOpsConfig: CentOpsConfig,
     private readonly httpService: HttpService,
     private readonly rabbitMQService: RabbitMQService,
     private readonly schedulerRegistry: SchedulerRegistry,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   onModuleInit(): void {
