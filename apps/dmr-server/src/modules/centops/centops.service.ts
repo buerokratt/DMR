@@ -6,10 +6,12 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
 
-import { ClientConfigDto, IGetAgentConfigListResponse, Utils } from '@dmr/shared';
+import { AgentDto, CentOpsEvent, ClientConfigDto, IGetAgentConfigListResponse } from '@dmr/shared';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CronJob } from 'cron';
 import { CentOpsConfig, centOpsConfig } from '../../common/config';
 import { RabbitMQService } from '../../libs/rabbitmq';
+import { CentOpsConfigurationDifference } from './interfaces/cent-ops-configuration-difference.interface';
 
 @Injectable()
 export class CentOpsService implements OnModuleInit {
@@ -24,6 +26,7 @@ export class CentOpsService implements OnModuleInit {
     private readonly httpService: HttpService,
     private readonly rabbitMQService: RabbitMQService,
     private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   onModuleInit(): void {
@@ -44,6 +47,10 @@ export class CentOpsService implements OnModuleInit {
     this.logger.log(
       `Cron job '${this.CENT_OPS_JOB_NAME}' scheduled for: ${this.centOpsConfig.cronTime}`,
     );
+  }
+
+  async getCentOpsConfigurations(): Promise<ClientConfigDto[]> {
+    return (await this.cacheManager.get<ClientConfigDto[]>(this.CENT_OPS_CONFIG_CACHE_KEY)) || [];
   }
 
   async getCentOpsConfigurationByClientId(clientId: string): Promise<ClientConfigDto | null> {
@@ -75,8 +82,6 @@ export class CentOpsService implements OnModuleInit {
       const configurations =
         (await this.cacheManager.get<ClientConfigDto[]>(this.CENT_OPS_CONFIG_CACHE_KEY)) ?? [];
 
-      const configurationsMap = Utils.mapFromArray(configurations, (item) => item.id);
-
       const newConfigurations: ClientConfigDto[] = [];
 
       for (const item of data.response) {
@@ -98,23 +103,20 @@ export class CentOpsService implements OnModuleInit {
           continue;
         }
 
-        const synchronized = !!configurationsMap[item.id];
-
-        if (synchronized) {
-          delete configurationsMap[item.id];
-        } else {
-          await this.rabbitMQService.setupQueue(item.id);
-        }
-
         newConfigurations.push(clientConfig);
       }
 
-      for (const deletedConfiguration of Object.values(configurationsMap)) {
+      const difference = this.getDifference(configurations, newConfigurations);
+
+      for (const addedConfiguration of difference.added) {
+        await this.rabbitMQService.setupQueue(addedConfiguration.id);
+      }
+      for (const deletedConfiguration of difference.deleted) {
         await this.rabbitMQService.deleteQueue(deletedConfiguration.id);
       }
 
       await this.cacheManager.set(this.CENT_OPS_CONFIG_CACHE_KEY, newConfigurations);
-
+      this.eventEmitter.emit(CentOpsEvent.UPDATED, difference);
       this.logger.log('CentOps configuration updated and stored in memory.');
 
       return newConfigurations;
@@ -125,5 +127,33 @@ export class CentOpsService implements OnModuleInit {
         );
       }
     }
+  }
+
+  private getDifference(
+    cacheData: ClientConfigDto[],
+    centOpsData: ClientConfigDto[],
+  ): CentOpsConfigurationDifference {
+    const oldIds = new Set(cacheData.map((item) => item.id));
+    const newIds = new Set(centOpsData.map((item) => item.id));
+
+    const added: AgentDto[] = [];
+    const deleted: AgentDto[] = [];
+
+    for (const newItem of centOpsData) {
+      if (!oldIds.has(newItem.id)) {
+        added.push({ ...newItem, deleted: false });
+      }
+    }
+
+    for (const oldItem of cacheData) {
+      if (!newIds.has(oldItem.id)) {
+        deleted.push({ ...oldItem, deleted: true });
+      }
+    }
+
+    return {
+      added: added,
+      deleted: deleted,
+    };
   }
 }
