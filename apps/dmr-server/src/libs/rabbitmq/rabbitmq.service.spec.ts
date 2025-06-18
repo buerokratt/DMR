@@ -52,6 +52,7 @@ vi.mock('amqplib', async () => {
 
 import { HttpService } from '@nestjs/axios';
 import * as amqplib from 'amqplib';
+import { of, throwError } from 'rxjs';
 const {
   assertQueueMock,
   deleteQueueMock,
@@ -63,6 +64,7 @@ const {
 } = (amqplib as any).__mocks;
 
 describe('RabbitMQService', () => {
+  let httpService: HttpService;
   let service: RabbitMQService;
   let schedulerRegistry: SchedulerRegistry;
   let cacheManager: Cache;
@@ -105,9 +107,10 @@ describe('RabbitMQService', () => {
       ],
     }).compile();
 
+    cacheManager = module.get(CACHE_MANAGER);
+    httpService = module.get<HttpService>(HttpService);
     service = module.get<RabbitMQService>(RabbitMQService);
     schedulerRegistry = module.get<SchedulerRegistry>(SchedulerRegistry);
-    cacheManager = module.get(CACHE_MANAGER);
 
     await service.onModuleInit();
   });
@@ -151,22 +154,36 @@ describe('RabbitMQService', () => {
   });
 
   it('should return true if queue exists', async () => {
-    checkQueueMock.mockResolvedValueOnce(true);
+    const mockData = {
+      arguments: {},
+      auto_delete: false,
+      durable: true,
+      exclusive: false,
+      leader: 'rabbit',
+      members: ['rabbit'],
+      name: 'test-queue',
+      node: 'rabbit',
+      online: ['rabbit'],
+      state: 'running',
+      type: 'quorum',
+      vhost: '/',
+    };
+
+    vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
     const result = await service.checkQueue('test-queue');
 
     expect(result).toBe(true);
-    expect(checkQueueMock).toHaveBeenCalledWith('test-queue');
   });
 
   it('should return false if queue does not exist', async () => {
-    checkQueueMock.mockRejectedValueOnce(new Error('Not Found'));
+    vi.spyOn(httpService, 'get').mockReturnValue(throwError(() => new Error('Not found')));
     const result = await service.checkQueue('test-queue');
 
     expect(result).toBe(false);
-    expect(checkQueueMock).toHaveBeenCalledWith('test-queue');
   });
 
   it('should setup queue and DLQ', async () => {
+    vi.spyOn(httpService, 'get').mockReturnValue(throwError(() => new Error('Not found')));
     const result = await service.setupQueue('test-queue', 1000);
 
     expect(result).toBe(true);
