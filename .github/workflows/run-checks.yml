@@ -23,14 +23,24 @@ jobs:
             command: npx nx run-many --target=lint:check --all
           - name: test-server
             command: npx nx run dmr-server:test
+            envFile: apps/dmr-server/.env.example
           - name: test-agent
             command: npx nx run dmr-agent:test
+            envFile: apps/dmr-agent/.env.example
           - name: test-e2e
             command: npx nx run-many --target=test:e2e --all
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+
+      - name: Load env vars if needed
+        if: matrix.envFile != null
+        run: |
+          set -o allexport
+          source ${{ matrix.envFile }}
+          set +o allexport
+
       - run: ${{ matrix.command }}
 
   build:
