@@ -6,8 +6,8 @@ export const AGENT_CONFIG_TOKEN = Symbol('AGENT_CONFIG_TOKEN');
 
 const variables = Utils.validateObject(
   {
-    id: process.env.AGENT_ID,
-    privateKey: process.env.AGENT_PRIVATE_KEY,
+    id: String(process.env.AGENT_ID),
+    privateKey: String(process.env.AGENT_PRIVATE_KEY),
   },
   {
     id: Joi.string().uuid().required(),
