@@ -10,7 +10,7 @@ import { AgentDto, CentOpsEvent, ClientConfigDto, IGetAgentConfigListResponse } 
 import { CronJob } from 'cron';
 import { CentOpsConfig, centOpsConfig } from '../../common/config';
 import { RabbitMQService } from '../../libs/rabbitmq';
-import { GetDifference } from './interfaces/get-difference.interface';
+import { CentOpsConfigurationDifference } from './interfaces/cent-ops-configuration-difference.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
@@ -111,7 +111,7 @@ export class CentOpsService implements OnModuleInit {
       for (const addedConfiguration of difference.added) {
         await this.rabbitMQService.setupQueue(addedConfiguration.id);
       }
-      for (const deletedConfiguration of difference.removed) {
+      for (const deletedConfiguration of difference.deleted) {
         await this.rabbitMQService.deleteQueue(deletedConfiguration.id);
       }
 
@@ -132,12 +132,12 @@ export class CentOpsService implements OnModuleInit {
   private getDifference(
     cacheData: ClientConfigDto[],
     centOpsData: ClientConfigDto[],
-  ): GetDifference {
+  ): CentOpsConfigurationDifference {
     const oldIds = new Set(cacheData.map((item) => item.id));
     const newIds = new Set(centOpsData.map((item) => item.id));
 
     const added: AgentDto[] = [];
-    const removed: AgentDto[] = [];
+    const deleted: AgentDto[] = [];
 
     for (const newItem of centOpsData) {
       if (!oldIds.has(newItem.id)) {
@@ -147,13 +147,13 @@ export class CentOpsService implements OnModuleInit {
 
     for (const oldItem of cacheData) {
       if (!newIds.has(oldItem.id)) {
-        removed.push({ ...oldItem, deleted: true });
+        deleted.push({ ...oldItem, deleted: true });
       }
     }
 
     return {
       added: added,
-      removed: removed,
+      deleted: deleted,
     };
   }
 }

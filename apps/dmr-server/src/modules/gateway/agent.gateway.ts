@@ -14,7 +14,7 @@ import { RabbitMQService } from '../../libs/rabbitmq';
 import { CentOpsService } from '../centops/centops.service';
 import { AgentEventNames, CentOpsEvent } from '@dmr/shared';
 import { OnEvent } from '@nestjs/event-emitter';
-import { GetDifference } from '../centops/interfaces/get-difference.interface';
+import { CentOpsConfigurationDifference } from '../centops/interfaces/cent-ops-configuration-difference.interface';
 
 @WebSocketGateway({
   connectionStateRecovery: {
@@ -68,9 +68,8 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @OnEvent(CentOpsEvent.UPDATED)
-  onAgentConfigUpdate(data: GetDifference): void {
-    this.server.emit(AgentEventNames.PARTIAL_AGENT_LIST, data.removed);
-    this.server.emit(AgentEventNames.PARTIAL_AGENT_LIST, data.added);
+  onAgentConfigUpdate(data: CentOpsConfigurationDifference): void {
+    this.server.emit(AgentEventNames.PARTIAL_AGENT_LIST, [...data.added, ...data.deleted]);
 
     this.logger.log('Agent configurations updated and emitted to all connected clients');
   }
