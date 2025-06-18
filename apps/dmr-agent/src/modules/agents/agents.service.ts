@@ -160,6 +160,11 @@ export class AgentsService implements OnModuleInit {
       const uuid = crypto.randomUUID();
       const recipient = await this.getAgentById(message.recipientId);
 
+      if (!recipient) {
+        this.logger.error(`Recipient info not found.`);
+        return null;
+      }
+
       const encryptedPayload = await Utils.encryptPayload(
         message.payload,
         this.agentConfig.privateKey,
@@ -171,7 +176,7 @@ export class AgentsService implements OnModuleInit {
         type: MessageType.Message,
         payload: encryptedPayload,
         recipientId: recipient.id,
-        senderId: this.agentConfig.uuid,
+        senderId: this.agentConfig.id,
         timestamp: new Date().toISOString(),
       };
 
@@ -189,6 +194,11 @@ export class AgentsService implements OnModuleInit {
     try {
       const sender = await this.getAgentById(message.senderId);
 
+      if (!sender) {
+        this.logger.error(`Sender info not found.`);
+        return null;
+      }
+
       const decryptedPayload = await Utils.decryptPayload(
         message.payload,
         sender.authenticationCertificate,
@@ -199,7 +209,7 @@ export class AgentsService implements OnModuleInit {
         id: message.id,
         type: message.type,
         payload: decryptedPayload.data,
-        recipientId: this.agentConfig.uuid,
+        recipientId: this.agentConfig.id,
         senderId: sender.id,
         timestamp: message.timestamp,
       };

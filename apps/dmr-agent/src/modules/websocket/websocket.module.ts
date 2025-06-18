@@ -11,7 +11,7 @@ import { WebsocketService } from './websocket.service';
         signOptions: {
           algorithm: 'RS256',
           expiresIn: '1m',
-          keyid: agentConfig.uuid,
+          keyid: agentConfig.id,
         },
       }),
     }),

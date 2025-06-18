@@ -1,9 +1,9 @@
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as rabbit from 'amqplib';
-import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
 import { ConsumeMessage } from 'amqplib';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
@@ -49,14 +49,12 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
     this._connection.on('close', () => this.onClose());
     this._connection.on('error', (error: Error) => {
-      this.logger.error(error);
       this.logger.error(`RabbitMQ connection error: ${error.message}`);
     });
 
     this._channel = await this._connection.createChannel();
 
     this._channel.on('error', (error: Error) => {
-      this.logger.error(error);
       this.logger.error(`RabbitMQ chanel error: ${error.message}`);
     });
 

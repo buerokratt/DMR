@@ -18,7 +18,7 @@ export const encryptPayload = async (
   // Load recipient's public key (for encryption)
   const recipientPublicKey = await importSPKI(recipientPublicKeyString, 'RSA-OAEP');
 
-  // 5. Encrypt the signed JWT
+  // Encrypt the signed JWT
   const jwe = await new CompactEncrypt(encoder.encode(jwt))
     .setProtectedHeader({ alg: 'RSA-OAEP', enc: 'A256GCM' })
     .encrypt(recipientPublicKey);

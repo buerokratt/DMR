@@ -1,27 +1,8 @@
-import { IsEnum, IsNotEmpty, IsString, IsUUID } from 'class-validator';
-import { MessageType } from '../enums';
+import { IsNotEmpty, IsString } from 'class-validator';
+import { BaseMessageDto } from './base-message.dto';
 
-export class AgentEncryptedMessageDto {
-  @IsUUID()
-  @IsNotEmpty()
-  id: string; // Message ID, for now, generate a UUID with crypto.randomUUID()
-
-  @IsString()
-  @IsNotEmpty()
-  timestamp: string; // Use a current timestamp
-
-  @IsUUID()
-  @IsNotEmpty()
-  senderId: string; // This agent ID
-
-  @IsUUID()
-  @IsNotEmpty()
-  recipientId: string; // Recipient agent ID
-
+export class AgentEncryptedMessageDto extends BaseMessageDto {
   @IsString()
   @IsNotEmpty()
   payload: string;
-
-  @IsEnum(MessageType)
-  type: MessageType;
 }

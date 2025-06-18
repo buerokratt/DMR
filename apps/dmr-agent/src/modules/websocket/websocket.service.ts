@@ -29,7 +29,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
         reconnectionDelay: this.webSocketConfig.reconnectionDelayMin,
         reconnectionDelayMax: this.webSocketConfig.reconnectionDelayMax,
         auth: {
-          token: this.generateJwtToken(this.agentConfig.uuid, this.agentConfig.privateKey),
+          token: this.generateJwtToken(this.agentConfig.id, this.agentConfig.privateKey),
         },
       };
 
@@ -78,7 +78,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
 
       if (this.socket) {
         this.socket.auth = {
-          token: this.generateJwtToken(this.agentConfig.uuid, this.agentConfig.privateKey),
+          token: this.generateJwtToken(this.agentConfig.id, this.agentConfig.privateKey),
         };
       }
     });
