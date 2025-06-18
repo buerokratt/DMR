@@ -4,23 +4,23 @@ import { IAgent } from '../interfaces/agent.interface';
 export class AgentDto implements IAgent {
   @IsUUID()
   @IsNotEmpty()
-  id: string;
+  id!: string;
 
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsNotEmpty()
-  authenticationCertificate: string;
+  authenticationCertificate!: string;
 
   @IsString()
   @IsNotEmpty()
-  createdAt: string;
+  createdAt!: string;
 
   @IsString()
   @IsNotEmpty()
-  updatedAt: string;
+  updatedAt!: string;
 
   @IsBoolean()
   @IsOptional()
