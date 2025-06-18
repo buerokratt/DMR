@@ -4,8 +4,6 @@ import { ConfigModule } from '@nestjs/config';
 import { configs } from './config';
 
 @Module({
-  controllers: [],
-  providers: [],
   imports: [
     ConfigModule.forRoot({
       load: configs,

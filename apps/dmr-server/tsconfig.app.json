@@ -8,5 +8,5 @@
     "emitDecoratorMetadata": true,
     "target": "es2021"
   },
-  "include": ["src/**/*.ts", "src/modules/centops/interfaces/centops.interface.ts"]
+  "include": ["src/**/*.ts"]
 }

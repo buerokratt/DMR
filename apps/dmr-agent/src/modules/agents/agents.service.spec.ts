@@ -1,17 +1,18 @@
-import { IAgent, IAgentList } from '@dmr/shared';
+import { IAgent, IAgentList, MessageType, Utils } from '@dmr/shared';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as classTransformer from 'class-transformer';
 import * as classValidator from 'class-validator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentConfig, AgentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 import { AgentsService } from './agents.service';
 
 describe('AgentsService', () => {
   let service: AgentsService;
-  let mockWebsocketService: WebsocketService;
-  let mockCacheManager: {
-    get: (key: string) => Promise<any>;
-    set: (key: string, value: any, ttl?: number) => Promise<void>;
-  };
+  let websocketService: WebsocketService;
+  let cacheManager: Cache;
+  let agentConfigMock: AgentConfig;
 
   const agent1: IAgent = {
     id: '1',
@@ -38,22 +39,36 @@ describe('AgentsService', () => {
     deleted: true,
   };
 
-  beforeEach(() => {
-    mockWebsocketService = {
-      isConnected: vi.fn(),
-      getSocket: vi.fn(),
-    } as any;
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AgentsService,
+        {
+          provide: agentConfig.KEY,
+          useValue: {
+            id: 'test-agent',
+            privateKey: 'test-private-key',
+          },
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: { set: vi.fn(), get: vi.fn() },
+        },
+        {
+          provide: WebsocketService,
+          useValue: { isConnected: vi.fn(), getSocket: vi.fn() },
+        },
+      ],
+    }).compile();
 
-    mockCacheManager = {
-      get: vi.fn(),
-      set: vi.fn(),
-    };
+    service = module.get(AgentsService);
+    websocketService = module.get(WebsocketService);
+    cacheManager = module.get(CACHE_MANAGER);
+    agentConfigMock = module.get(agentConfig.KEY);
 
     // Mock transform and validation globally
     vi.spyOn(classTransformer, 'plainToInstance').mockImplementation((_, obj) => obj as any);
     vi.spyOn(classValidator, 'validate').mockResolvedValue([]); // Assume always valid
-
-    service = new AgentsService(mockCacheManager as any, mockWebsocketService);
   });
 
   it('should call setupSocketEventListeners on module init', () => {
@@ -69,19 +84,19 @@ describe('AgentsService', () => {
 
     await (service as any).handleFullAgentListEvent(data);
 
-    expect(mockCacheManager.set).toHaveBeenCalledWith(
+    expect(cacheManager.set).toHaveBeenCalledWith(
       'DMR_AGENTS_LIST',
       expect.arrayContaining([
         expect.objectContaining({ id: '1' }),
         expect.objectContaining({ id: '3' }),
       ]),
     );
-    const cachedAgents = (mockCacheManager.set as any).mock.calls[0][1];
+    const cachedAgents = (cacheManager.set as any).mock.calls[0][1];
     expect(cachedAgents).toHaveLength(2);
   });
 
   it('should merge agents and delete marked ones on partial list event', async () => {
-    mockCacheManager.get = vi.fn().mockResolvedValue([agent1]);
+    cacheManager.get = vi.fn().mockResolvedValue([agent1]);
 
     const update: IAgentList = {
       response: [agent2, { ...agent1, deleted: true }],
@@ -89,7 +104,7 @@ describe('AgentsService', () => {
 
     await (service as any).handlePartialAgentListEvent(update);
 
-    expect(mockCacheManager.set).toHaveBeenCalledWith(
+    expect(cacheManager.set).toHaveBeenCalledWith(
       'DMR_AGENTS_LIST',
       [expect.objectContaining({ id: '2' })],
       0,
@@ -97,23 +112,150 @@ describe('AgentsService', () => {
   });
 
   it('should retrieve agent by ID from cache', async () => {
-    mockCacheManager.get = vi.fn().mockResolvedValue([agent1, agent2]);
+    cacheManager.get = vi.fn().mockResolvedValue([agent1, agent2]);
 
     const result = await service.getAgentById('2');
     expect(result).toEqual(agent2);
   });
 
   it('should return null if agent ID is not found', async () => {
-    mockCacheManager.get = vi.fn().mockResolvedValue([agent1]);
+    cacheManager.get = vi.fn().mockResolvedValue([agent1]);
 
     const result = await service.getAgentById('not-found');
     expect(result).toBeNull();
   });
 
   it('should return null if getAgentById throws error', async () => {
-    mockCacheManager.get = vi.fn().mockRejectedValue(new Error('Unexpected error'));
+    cacheManager.get = vi.fn().mockRejectedValue(new Error('Unexpected error'));
 
     const result = await service.getAgentById('1');
     expect(result).toBeNull();
+  });
+
+  const encryptedPayload = 'encrypted-payload';
+  const decryptedPayload = { data: ['decrypted'] };
+
+  describe('encryptMessagePayloadFromExternalService', () => {
+    it('should return encrypted message if recipient is found', async () => {
+      const mockRecipient = {
+        id: 'recipient-id',
+        authenticationCertificate: 'mock-recipient-key',
+      };
+
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockRecipient);
+      vi.spyOn(Utils, 'encryptPayload').mockResolvedValueOnce(encryptedPayload);
+
+      const message = {
+        payload: ['some-data'],
+        recipientId: mockRecipient.id,
+      };
+
+      const result = await service.encryptMessagePayloadFromExternalService(message);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          type: 'Message',
+          payload: encryptedPayload,
+          recipientId: mockRecipient.id,
+          senderId: agentConfigMock.id,
+          timestamp: expect.any(String),
+        }),
+      );
+    });
+
+    it('should return null if recipient is not found', async () => {
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(null);
+
+      const result = await service.encryptMessagePayloadFromExternalService({
+        payload: ['data'],
+        recipientId: 'invalid',
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if exception thrown', async () => {
+      const mockRecipient = {
+        id: 'recipient-id',
+        authenticationCertificate: 'mock-recipient-key',
+      };
+
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockRecipient);
+      vi.spyOn(Utils, 'encryptPayload').mockRejectedValueOnce(new Error('Test Error'));
+
+      const result = await service.encryptMessagePayloadFromExternalService({
+        payload: ['data'],
+        recipientId: 'recipient-id',
+      });
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('decryptMessagePayloadFromDMRServer', () => {
+    it('should return decrypted message if sender is found', async () => {
+      const mockSender = {
+        id: 'sender-id',
+        authenticationCertificate: 'mock-sender-key',
+      };
+
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockSender);
+      vi.spyOn(Utils, 'decryptPayload').mockResolvedValueOnce(decryptedPayload);
+
+      const result = await service.decryptMessagePayloadFromDMRServer({
+        id: 'id',
+        type: MessageType.Message,
+        payload: encryptedPayload,
+        senderId: mockSender.id,
+        recipientId: agentConfigMock.id,
+        timestamp: '2025-06-16T00:00:00.000Z',
+      });
+
+      expect(result).toEqual({
+        id: 'id',
+        type: MessageType.Message,
+        payload: decryptedPayload.data,
+        senderId: mockSender.id,
+        recipientId: agentConfigMock.id,
+        timestamp: '2025-06-16T00:00:00.000Z',
+      });
+    });
+
+    it('should return null if sender not found', async () => {
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(null);
+
+      const result = await service.decryptMessagePayloadFromDMRServer({
+        id: 'id',
+        type: MessageType.Message,
+        payload: 'payload',
+        senderId: 'invalid-id',
+        recipientId: agentConfigMock.id,
+        timestamp: '',
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if decryption fails', async () => {
+      const mockSender = {
+        id: 'sender-id',
+        authenticationCertificate: 'mock-sender-key',
+      };
+
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockSender);
+      vi.spyOn(Utils, 'decryptPayload').mockRejectedValueOnce(new Error('Decrypt fail'));
+
+      const result = await service.decryptMessagePayloadFromDMRServer({
+        id: 'id',
+        type: MessageType.Message,
+        payload: encryptedPayload,
+        senderId: mockSender.id,
+        recipientId: agentConfigMock.id,
+        timestamp: '',
+      });
+
+      expect(result).toBeNull();
+    });
   });
 });

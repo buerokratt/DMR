@@ -1,20 +1,27 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
+import { AppModule } from './app.module';
+import { APP_CONFIG_TOKEN, AppConfig, GlobalConfig } from './common/config';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: true });
   app.use(compression());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
-  const port = process.env.PORT || 5001;
-  await app.listen(port);
-  if (process.env.NODE_ENV === 'development') {
+
+  const configService = app.get<ConfigService<GlobalConfig>>(ConfigService);
+  const appConfig = configService.getOrThrow<AppConfig>(APP_CONFIG_TOKEN);
+
+  await app.listen(appConfig.port);
+
+  if (appConfig.environment === 'development') {
     const logger = new Logger('bootstrap');
     logger.log(`Listening on ${await app.getUrl()}`);
   }
-  Logger.log(`🚀 Application is running on: http://localhost:${port}`);
+
+  Logger.log(`🚀 Application is running on: http://localhost:${appConfig.port}`);
 }
 
 void bootstrap();

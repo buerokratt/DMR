@@ -1,8 +1,10 @@
 import { JwtPayload } from '@dmr/shared';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { io, ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
+import { AgentConfig, agentConfig } from '../../common/config/agent.config';
+import { DMRServerConfig, dmrServerConfig } from '../../common/config/dmr-server.config';
+import { webSocketConfig, WebSocketConfig } from '../../common/config/web-socket.config';
 
 @Injectable()
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
@@ -11,7 +13,9 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   private reconnectionAttempts = 0;
 
   constructor(
-    private readonly configService: ConfigService,
+    @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
+    @Inject(dmrServerConfig.KEY) private readonly dmrServerConfig: DMRServerConfig,
+    @Inject(webSocketConfig.KEY) private readonly webSocketConfig: WebSocketConfig,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -20,37 +24,16 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   }
 
   private connectToServer(): void {
-    const requiredConfigs = {
-      serverUrl: this.configService.get<string>('DMR_SERVER_WEBSOCKET_URL'),
-      agentId: this.configService.get<string>('AGENT_ID'),
-      privateKey: this.configService.get<string>('AGENT_PRIVATE_KEY'),
-    };
-
-    const configNameMap = {
-      serverUrl: 'DMR_SERVER_WEBSOCKET_URL',
-      agentId: 'AGENT_ID',
-      privateKey: 'AGENT_PRIVATE_KEY',
-    } as const;
-
-    for (const [key, value] of Object.entries(requiredConfigs)) {
-      if (!value) {
-        const configName = configNameMap[key as keyof typeof configNameMap];
-        this.logger.error(`${configName} is not configured`);
-        return;
-      }
-    }
-
     try {
-      const { serverUrl, agentId, privateKey } = requiredConfigs;
       const socketOptions: Partial<ManagerOptions & SocketOptions> = {
-        reconnectionDelay: this.configService.get<number>('WEBSOCKET_RECONNECTION_DELAY', 1000),
-        reconnectionDelayMax: this.configService.get<number>('WEBSOCKET_DELAY_MAX', 5000),
+        reconnectionDelay: this.webSocketConfig.reconnectionDelayMin,
+        reconnectionDelayMax: this.webSocketConfig.reconnectionDelayMax,
         auth: {
-          token: this.generateJwtToken(agentId, privateKey),
+          token: this.generateJwtToken(this.agentConfig.id, this.agentConfig.privateKey),
         },
       };
 
-      this.socket = io(serverUrl, socketOptions);
+      this.socket = io(this.dmrServerConfig.webSocketURL, socketOptions);
 
       this.setupSocketEventListeners();
     } catch (error) {
@@ -67,6 +50,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
 
     this.socket.on('connect', () => {
       this.reconnectionAttempts = 0;
+
       if (this.socket) {
         this.logger.log(`Connected to DMR server with ID: ${this.socket.id}`);
         this.logger.log(
@@ -91,11 +75,10 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
 
     this.socket.on('reconnect_attempt', () => {
       this.logger.log('Attempting to reconnect to DMR server...');
-      const agentId = this.configService.get<string>('AGENT_ID');
-      const privateKey = this.configService.get<string>('AGENT_PRIVATE_KEY');
-      if (agentId && privateKey && this.socket) {
+
+      if (this.socket) {
         this.socket.auth = {
-          token: this.generateJwtToken(agentId, privateKey),
+          token: this.generateJwtToken(this.agentConfig.id, this.agentConfig.privateKey),
         };
       }
     });

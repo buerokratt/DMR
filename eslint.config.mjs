@@ -120,6 +120,7 @@ export default [
       '**/vitest.config.e2e.mts',
       '**/test/**/*.ts',
       '**/apps/**/eslint.config.mjs',
+      '**/libs/**/eslint.config.mjs',
       '**/*.spec.ts',
     ],
   },

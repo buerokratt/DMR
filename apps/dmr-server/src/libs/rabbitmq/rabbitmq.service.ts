@@ -1,9 +1,9 @@
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as rabbit from 'amqplib';
-import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
 import { ConsumeMessage } from 'amqplib';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
@@ -53,6 +53,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     });
 
     this._channel = await this._connection.createChannel();
+
+    this._channel.on('error', (error: Error) => {
+      this.logger.error(`RabbitMQ chanel error: ${error.message}`);
+    });
+
     this.logger.log('RabbitMQ connected');
   }
 
@@ -91,7 +96,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
       // Create DLQ for our queue
       await this._channel.assertQueue(dlqName, {
         durable: true,
-        arguments: { 'x-queue-type': 'quorum', 'x-message-ttl': this.rabbitMQConfig.dlqTTL },
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': this.rabbitMQConfig.dlqTTL,
+        },
       });
 
       // Create and setup our queue
@@ -141,6 +149,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
     try {
       await this._channel.checkQueue(queueName);

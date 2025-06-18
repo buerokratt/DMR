@@ -21,14 +21,25 @@ jobs:
             command: npx nx format:check --all
           - name: lint
             command: npx nx run-many --target=lint:check --all
-          - name: test
-            command: npx nx run-many --target=test --all
+          - name: test-server
+            command: npx nx run dmr-server:test
+          - name: test-agent
+            command: npx nx run dmr-agent:test
           - name: test-e2e
             command: npx nx run-many --target=test:e2e --all
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+
+      - name: Use env for server
+        if: matrix.name == 'test-server'
+        run: cp apps/dmr-server/.env.example apps/dmr-server/.env
+
+      - name: Use env for agent
+        if: matrix.name == 'test-agent'
+        run: cp apps/dmr-agent/.env.example apps/dmr-agent/.env
+
       - run: ${{ matrix.command }}
 
   build:

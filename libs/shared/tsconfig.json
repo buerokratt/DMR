@@ -1,11 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "composite": true
+    "esModuleInterop": true
   },
   "files": [],
-  "include": [],
+  "include": ["libs/shared/eslint.config.mjs"],
   "references": [
     {
       "path": "./tsconfig.lib.json"

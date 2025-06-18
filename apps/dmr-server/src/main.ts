@@ -15,7 +15,6 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
 
   const configService = app.get<ConfigService<GlobalConfig>>(ConfigService);
-
   const appConfig = configService.getOrThrow<AppConfig>(APP_CONFIG_TOKEN);
 
   await app.listen(appConfig.port);
