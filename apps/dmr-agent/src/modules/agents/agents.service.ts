@@ -3,6 +3,8 @@ import {
   AgentDto,
   AgentEncryptedMessageDto,
   AgentEventNames,
+  DmrError,
+  ErrorType,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
@@ -13,7 +15,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 
@@ -127,11 +129,21 @@ export class AgentsService implements OnModuleInit {
   }
 
   private async handleMessageFromDMRServerEvent(message: AgentEncryptedMessageDto): Promise<void> {
+    const errors: DmrError[] = [];
+
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
       if (!decryptedMessage) {
         this.logger.error(`Something went wrong while decrypting the message`);
+        errors.push({
+          type: ErrorType.DECRYPTION_FAILED,
+          details: {
+            errorMessage: 'Something went wrong while decrypting the message.',
+            messageId: message.id,
+          },
+        });
+
         return;
       }
 
@@ -139,6 +151,19 @@ export class AgentsService implements OnModuleInit {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
+
+      errors.push({
+        type: ErrorType.SIGNATURE_VALIDATION_FAILED,
+        details: { errorMessage: errorMessage, messageId: message.id },
+      });
+    }
+
+    if (errors.length !== 0) {
+      this.websocketService.getSocket()?.emit(AgentEventNames.MESSAGE_PROCESSING_FAILED, errors);
+
+      this.logger.warn(
+        `Emitted ${AgentEventNames.MESSAGE_PROCESSING_FAILED} event for message ${message.id} with errors: ${JSON.stringify(errors)}`,
+      );
     }
   }
 
@@ -217,8 +242,9 @@ export class AgentsService implements OnModuleInit {
       return decryptedMessage;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+
       this.logger.error(`Error decrypting message: ${errorMessage}`);
-      return null;
+      throw new BadRequestException(errorMessage);
     }
   }
 }
