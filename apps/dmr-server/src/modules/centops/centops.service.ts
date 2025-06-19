@@ -5,7 +5,6 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
-
 import { AgentDto, CentOpsEvent, ClientConfigDto, IGetAgentConfigListResponse } from '@dmr/shared';
 import { CronJob } from 'cron';
 import { CentOpsConfig, centOpsConfig } from '../../common/config';
