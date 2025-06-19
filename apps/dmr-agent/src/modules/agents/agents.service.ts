@@ -143,11 +143,9 @@ export class AgentsService implements OnModuleInit {
             messageId: message.id,
           },
         });
-
-        return;
+      } else {
+        this.logger.log('Message is decrypted');
       }
-
-      this.logger.log('Message is decrypted');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
