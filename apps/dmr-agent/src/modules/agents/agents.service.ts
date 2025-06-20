@@ -3,16 +3,18 @@ import {
   AgentDto,
   AgentEncryptedMessageDto,
   AgentEventNames,
-  DmrError,
-  ErrorType,
+  ValidationErrorType,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
   MessageType,
   Utils,
+  SimpleValidationFailureMessage,
+  ValidationErrorDto,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import * as crypto from 'node:crypto';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -129,7 +131,7 @@ export class AgentsService implements OnModuleInit {
   }
 
   private async handleMessageFromDMRServerEvent(message: AgentEncryptedMessageDto): Promise<void> {
-    const errors: DmrError[] = [];
+    const errors: ValidationErrorDto[] = [];
 
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
@@ -137,11 +139,8 @@ export class AgentsService implements OnModuleInit {
       if (!decryptedMessage) {
         this.logger.error(`Something went wrong while decrypting the message`);
         errors.push({
-          type: ErrorType.DECRYPTION_FAILED,
-          details: {
-            errorMessage: 'Something went wrong while decrypting the message.',
-            messageId: message.id,
-          },
+          type: ValidationErrorType.DECRYPTION_FAILED,
+          message: 'Something went wrong while decrypting the message.',
         });
       } else {
         this.logger.log('Message is decrypted');
@@ -151,13 +150,20 @@ export class AgentsService implements OnModuleInit {
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
 
       errors.push({
-        type: ErrorType.SIGNATURE_VALIDATION_FAILED,
-        details: { errorMessage: errorMessage, messageId: message.id },
+        type: ValidationErrorType.SIGNATURE_VALIDATION_FAILED,
+        message: errorMessage,
       });
     }
 
     if (errors.length !== 0) {
-      this.websocketService.getSocket()?.emit(AgentEventNames.MESSAGE_PROCESSING_FAILED, errors);
+      const error: SimpleValidationFailureMessage = {
+        id: crypto.randomUUID(),
+        errors: errors,
+        message: `Error while decrypting message ${message.id}`,
+        receivedAt: new Date().toISOString(),
+      };
+
+      this.websocketService.getSocket()?.emit(AgentEventNames.MESSAGE_PROCESSING_FAILED, error);
 
       this.logger.warn(
         `Emitted ${AgentEventNames.MESSAGE_PROCESSING_FAILED} event for message ${message.id} with errors: ${JSON.stringify(errors)}`,

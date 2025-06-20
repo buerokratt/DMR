@@ -1,4 +1,11 @@
-import { AgentEventNames, ErrorType, IAgent, IAgentList, MessageType, Utils } from '@dmr/shared';
+import {
+  AgentEventNames,
+  IAgent,
+  IAgentList,
+  MessageType,
+  Utils,
+  ValidationErrorType,
+} from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as classTransformer from 'class-transformer';
@@ -291,18 +298,14 @@ describe('AgentsService', () => {
 
       expect(emitSpy).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_PROCESSING_FAILED,
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: ErrorType.DECRYPTION_FAILED,
-            details: expect.objectContaining({
-              errorMessage: expect.any(String),
-              messageId: message.id,
+        expect.objectContaining({
+          errors: expect.arrayContaining([
+            expect.objectContaining({
+              type: ValidationErrorType.DECRYPTION_FAILED,
             }),
-          }),
-        ]),
+          ]),
+        }),
       );
     });
-
-    // You can include other tests here
   });
 });
