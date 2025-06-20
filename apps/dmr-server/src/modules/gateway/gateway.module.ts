@@ -35,6 +35,10 @@ import { AgentGateway } from './agent.gateway';
       name: Metrics.dmrSocketErrorsTotal,
       help: Metrics.dmrSocketErrorsTotalHelp,
     }),
+    makeCounterProvider({
+      name: Metrics.dmrSocketEventsReceivedTotal,
+      help: Metrics.dmrSocketEventsReceivedTotalHelp,
+    }),
   ],
 })
 export class GatewayModule {}
