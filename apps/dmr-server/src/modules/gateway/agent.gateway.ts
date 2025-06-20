@@ -1,4 +1,10 @@
-import { AgentEventNames, AgentMessageDto, CentOpsEvent, ValidationErrorDto } from '@dmr/shared';
+import {
+  AgentEncryptedMessageDto,
+  AgentEventNames,
+  AgentMessageDto,
+  DmrServerEvent,
+  ValidationErrorDto,
+} from '@dmr/shared';
 import { BadRequestException, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
@@ -141,11 +147,38 @@ export class AgentGateway
     this.logger.log(`Agent disconnected: ${agentId} (Socket ID: ${client.id})`);
   }
 
-  @OnEvent(CentOpsEvent.UPDATED)
+  @OnEvent(DmrServerEvent.UPDATED)
   onAgentConfigUpdate(data: CentOpsConfigurationDifference): void {
     this.server.emit(AgentEventNames.PARTIAL_AGENT_LIST, [...data.added, ...data.deleted]);
 
     this.logger.log('Agent configurations updated and emitted to all connected clients');
+  }
+
+  @OnEvent(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT)
+  onRabbitMQMessage(payload: { agentId: string; message: AgentEncryptedMessageDto }): void {
+    try {
+      const { agentId, message } = payload;
+      const socket = this.findSocketByAgentId(agentId);
+      if (!socket) {
+        this.logger.warn(`No connected socket found for agent ${agentId}`);
+        return;
+      }
+      socket.emit(AgentEventNames.MESSAGE_FROM_DMR_SERVER, message);
+      this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error forwarding RabbitMQ message to agent: ${errorMessage}`);
+    }
+  }
+
+  private findSocketByAgentId(agentId: string): Socket | null {
+    const connectedSockets = this.server.sockets.sockets;
+    for (const [, socket] of connectedSockets.entries()) {
+      if (socket.agent?.sub === agentId) {
+        return socket;
+      }
+    }
+    return null;
   }
 
   @SubscribeMessage(AgentEventNames.MESSAGE_TO_DMR_SERVER)

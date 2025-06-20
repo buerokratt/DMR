@@ -9,7 +9,7 @@ import { CentOpsService } from './centops.service';
 import { centOpsConfig } from '../../common/config';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CentOpsEvent } from '@dmr/shared';
+import { DmrServerEvent } from '@dmr/shared';
 
 describe('CentOpsService', () => {
   let service: CentOpsService;
@@ -94,7 +94,7 @@ describe('CentOpsService', () => {
     expect(httpService.get).toHaveBeenCalledWith('http://test-url');
     expect(cacheManager.get).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION');
     expect(cacheManager.set).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION', expect.any(Array));
-    expect(eventEmitter.emit).toHaveBeenCalledWith(CentOpsEvent.UPDATED, expect.any(Object));
+    expect(eventEmitter.emit).toHaveBeenCalledWith(DmrServerEvent.UPDATED, expect.any(Object));
   });
 
   it('should log error if validation fails', async () => {
