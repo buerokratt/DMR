@@ -1,8 +1,8 @@
-import { AgentEncryptedMessageDto, AgentEventNames, DmrServerEvent } from '@dmr/shared';
 import {
+  AgentEncryptedMessageDto,
   AgentEventNames,
   AgentMessageDto,
-  CentOpsEvent,
+  DmrServerEvent,
   SimpleValidationFailureMessage,
   ValidationErrorDto,
 } from '@dmr/shared';
