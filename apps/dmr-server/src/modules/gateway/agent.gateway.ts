@@ -45,8 +45,14 @@ export class AgentGateway
     private readonly connectionsTotalCounter: Counter<string>,
     @InjectMetric(Metrics.dmrSocketDisconnectionsTotal)
     private readonly disconnectionsTotalCounter: Counter<string>,
+    @InjectMetric(Metrics.dmrSocketEventsReceivedTotal)
+    private readonly eventsReceivedTotalCounter: Counter<string>,
+    @InjectMetric(Metrics.dmrSocketEventsSentTotal)
+    private readonly eventsSentTotalCounter: Counter<string>,
     @InjectMetric(Metrics.dmrSocketConnectionDurationSeconds)
-    private readonly dmrSocketConnectionDurationSecondsHistogram: Histogram<string>,
+    private readonly socketConnectionDurationSecondsHistogram: Histogram<string>,
+    @InjectMetric(Metrics.dmrMessageProcessingDurationSeconds)
+    private readonly messageProcessingDurationSeconds: Histogram<string>,
     private readonly authService: AuthService,
     private readonly rabbitService: RabbitMQService,
     private readonly messageValidator: MessageValidatorService,
@@ -56,12 +62,33 @@ export class AgentGateway
 
   onModuleInit() {
     this.handleError = (socket: Socket) => {
-      socket.on('error', () => {
-        this.errorsTotalCounter.inc(1);
+      const namespace = socket.nsp.name;
+
+      socket.onAny((event: string) => {
+        if (event === 'error') {
+          this.errorsTotalCounter.inc(1);
+        }
+
+        const ignored = ['ping', 'disconnect', 'connect', 'error'];
+        if (!ignored.includes(event)) {
+          this.eventsReceivedTotalCounter.inc({ event, namespace });
+        }
+      });
+
+      socket.onAnyOutgoing((event: string) => {
+        this.eventsSentTotalCounter.inc({ event, namespace: '/' });
       });
     };
 
     this.server.on('connection', this.handleError);
+
+    const emit = (event: string, ...arguments_: unknown[]) => {
+      this.eventsSentTotalCounter.inc({ event, namespace: '/' });
+
+      return this.server.emit(event, ...arguments_);
+    };
+
+    this.server.emit = emit;
   }
 
   onModuleDestroy() {
@@ -108,7 +135,7 @@ export class AgentGateway
     if (connectedAt) {
       const durationSeconds = (Date.now() - connectedAt) / 1000;
 
-      this.dmrSocketConnectionDurationSecondsHistogram.observe(durationSeconds);
+      this.socketConnectionDurationSecondsHistogram.observe(durationSeconds);
     }
 
     this.logger.log(`Agent disconnected: ${agentId} (Socket ID: ${client.id})`);
@@ -127,12 +154,18 @@ export class AgentGateway
     @MessageBody() data: unknown,
   ): Promise<void> {
     const receivedAt = new Date().toISOString();
+    const end = this.messageProcessingDurationSeconds.startTimer({
+      event: AgentEventNames.MESSAGE_TO_DMR_SERVER,
+    });
+
     try {
       const result = await this.messageValidator.validateMessage(data, receivedAt);
       await this.handleValidMessage(result, receivedAt);
     } catch (error: unknown) {
       await this.handleMessageError(error);
     }
+
+    end();
   }
 
   private async handleValidMessage(
