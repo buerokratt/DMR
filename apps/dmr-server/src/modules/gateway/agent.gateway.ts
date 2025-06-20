@@ -1,4 +1,10 @@
-import { AgentEventNames, AgentMessageDto, CentOpsEvent, ValidationErrorDto } from '@dmr/shared';
+import {
+  AgentEventNames,
+  AgentMessageDto,
+  CentOpsEvent,
+  SimpleValidationFailureMessage,
+  ValidationErrorDto,
+} from '@dmr/shared';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
@@ -87,6 +93,22 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const result = await this.messageValidator.validateMessage(data, receivedAt);
       await this.handleValidMessage(result, receivedAt);
+    } catch (error: unknown) {
+      await this.handleMessageError(error);
+    }
+  }
+
+  @SubscribeMessage(AgentEventNames.MESSAGE_PROCESSING_FAILED)
+  async handleError(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: SimpleValidationFailureMessage,
+  ) {
+    try {
+      await this.rabbitMQMessageService.sendValidationFailure(
+        data.message,
+        data.errors,
+        data.receivedAt,
+      );
     } catch (error: unknown) {
       await this.handleMessageError(error);
     }

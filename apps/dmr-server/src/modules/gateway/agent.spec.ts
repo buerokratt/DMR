@@ -7,7 +7,7 @@ import { MessageValidatorService } from './message-validator.service';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
-import { JwtPayload } from '@dmr/shared';
+import { JwtPayload, SimpleValidationFailureMessage, ValidationErrorType } from '@dmr/shared';
 import { AgentGateway } from './agent.gateway';
 import { AgentEventNames } from '@dmr/shared';
 
@@ -373,6 +373,46 @@ describe('AgentGateway', () => {
 
       expect(rabbitService.unsubscribe).not.toHaveBeenCalled();
       expect(loggerSpy).toHaveBeenCalledWith(`Agent disconnected: undefined (Socket ID: id5)`);
+    });
+  });
+
+  describe('handleError', () => {
+    const mockClient = createMockSocket('some-token');
+    const mockData: SimpleValidationFailureMessage = {
+      id: 'test-001',
+      errors: [
+        {
+          type: ValidationErrorType.DECRYPTION_FAILED,
+          message: 'Decrypting failed',
+        },
+      ],
+      receivedAt: new Date().toISOString(),
+      message: 'someValue',
+    };
+
+    it('should call sendValidationFailure with correct parameters', async () => {
+      mockRabbitMQMessageService.sendValidationFailure.mockResolvedValueOnce(undefined);
+      const spy = vi.spyOn(gateway as any, 'handleMessageError').mockImplementation(async () => {});
+
+      await gateway.handleError(mockClient, mockData);
+
+      expect(rabbitMQMessageService.sendValidationFailure).toHaveBeenCalledWith(
+        mockData.message,
+        mockData.errors,
+        mockData.receivedAt,
+      );
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('should call handleMessageError when sendValidationFailure throws', async () => {
+      const error = new Error('send failed');
+      mockRabbitMQMessageService.sendValidationFailure.mockRejectedValueOnce(error);
+
+      const spy = vi.spyOn(gateway as any, 'handleMessageError').mockImplementation(async () => {});
+
+      await gateway.handleError(mockClient, mockData);
+
+      expect(spy).toHaveBeenCalledWith(error);
     });
   });
 });
