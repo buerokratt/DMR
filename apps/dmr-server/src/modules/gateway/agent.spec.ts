@@ -115,14 +115,24 @@ describe('AgentGateway', () => {
     centOpsService = module.get<CentOpsService>(CentOpsService);
     rabbitMQMessageService = module.get(RabbitMQMessageService);
 
+    const mockSocketsMap = new Map<string, Socket>();
+
     serverMock = {
       sockets: {
-        sockets: new Map<string, Socket>(),
-        get: vi.fn((id: string) => serverMock.sockets.sockets.get(id)),
+        get sockets() {
+          return mockSocketsMap;
+        },
+        get: vi.fn((id: string) => mockSocketsMap.get(id)),
       },
       emit: vi.fn(),
       on: vi.fn(),
     } as any as Server;
+
+    (serverMock as any).setMockSockets = (socketsArray: [string, Socket][]) => {
+      mockSocketsMap.clear();
+      socketsArray.forEach(([id, socket]) => mockSocketsMap.set(id, socket));
+    };
+
     gateway.server = serverMock;
 
     loggerSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
@@ -404,8 +414,8 @@ describe('AgentGateway', () => {
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
 
-      // Add sockets to the server's sockets collection
-      serverMock.sockets.sockets = new Map([
+      // Add sockets to the server's sockets collection using our helper method
+      (serverMock as any).setMockSockets([
         ['socket-1', mockSocket1],
         ['socket-2', mockSocket2],
       ]);
@@ -434,7 +444,7 @@ describe('AgentGateway', () => {
 
     it('should log warning when no socket found for agent', () => {
       // Setup server with no matching socket
-      serverMock.sockets.sockets = new Map();
+      (serverMock as any).setMockSockets([]);
 
       const testMessage = {
         id: 'msg-123',
@@ -464,7 +474,7 @@ describe('AgentGateway', () => {
         throw new Error('Socket error');
       });
 
-      serverMock.sockets.sockets = new Map([['socket-1', mockSocket]]);
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
 
       const testMessage = {
         id: 'msg-123',
@@ -494,7 +504,7 @@ describe('AgentGateway', () => {
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
 
-      serverMock.sockets.sockets = new Map([
+      (serverMock as any).setMockSockets([
         ['socket-1', mockSocket1],
         ['socket-2', mockSocket2],
       ]);
@@ -506,7 +516,7 @@ describe('AgentGateway', () => {
 
     it('should return null when no socket found', () => {
       // Setup server with no matching socket
-      serverMock.sockets.sockets = new Map([
+      (serverMock as any).setMockSockets([
         ['socket-2', createMockSocket('token2', { sub: 'agent-456' }, 'socket-2')],
       ]);
 
@@ -520,7 +530,7 @@ describe('AgentGateway', () => {
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket3 = createMockSocket('token3', { sub: 'agent-123' }, 'socket-3');
 
-      serverMock.sockets.sockets = new Map([
+      (serverMock as any).setMockSockets([
         ['socket-1', mockSocket1],
         ['socket-3', mockSocket3],
       ]);
