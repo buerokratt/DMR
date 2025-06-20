@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../auth/auth.service';
 import { RabbitMQService } from '../../libs/rabbitmq';
+import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
 import { CentOpsService } from '../centops/centops.service';
+import { MessageValidatorService } from './message-validator.service';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
@@ -24,8 +26,17 @@ const mockRabbitMQService = {
   unsubscribe: vi.fn(),
 };
 
+const mockRabbitMQMessageService = {
+  sendValidMessage: vi.fn(),
+  sendValidationFailure: vi.fn(),
+};
+
 const mockCentOpsService = {
   getCentOpsConfigurations: vi.fn(),
+};
+
+const mockMessageValidatorService = {
+  validateMessage: vi.fn(),
 };
 
 describe('AgentGateway', () => {
@@ -33,6 +44,8 @@ describe('AgentGateway', () => {
   let authService: AuthService;
   let rabbitService: RabbitMQService;
   let centOpsService: CentOpsService;
+  let messageValidatorService: MessageValidatorService;
+  let rabbitMQMessageService: any;
   let loggerSpy: ReturnType<typeof vi.spyOn>;
   let loggerErrorSpy: ReturnType<typeof vi.spyOn>;
   let serverMock: Server;
@@ -68,14 +81,18 @@ describe('AgentGateway', () => {
         AgentGateway,
         { provide: AuthService, useValue: mockAuthService },
         { provide: RabbitMQService, useValue: mockRabbitMQService },
+        { provide: MessageValidatorService, useValue: mockMessageValidatorService },
         { provide: CentOpsService, useValue: mockCentOpsService },
+        { provide: RabbitMQMessageService, useValue: mockRabbitMQMessageService },
       ],
     }).compile();
 
     gateway = module.get<AgentGateway>(AgentGateway);
     authService = module.get<AuthService>(AuthService);
     rabbitService = module.get<RabbitMQService>(RabbitMQService);
+    messageValidatorService = module.get<MessageValidatorService>(MessageValidatorService);
     centOpsService = module.get<CentOpsService>(CentOpsService);
+    rabbitMQMessageService = module.get(RabbitMQMessageService);
 
     serverMock = {
       sockets: {
@@ -356,30 +373,6 @@ describe('AgentGateway', () => {
 
       expect(rabbitService.unsubscribe).not.toHaveBeenCalled();
       expect(loggerSpy).toHaveBeenCalledWith(`Agent disconnected: undefined (Socket ID: id5)`);
-    });
-  });
-
-  describe('handleMessage', () => {
-    it('should log simple message', () => {
-      const client = createMockSocket(undefined, { sub: 'a' }, 'mid');
-      gateway.handleMessage(client, 'Hello');
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: Hello`);
-    });
-
-    it('should cover null/undefined/object/number/boolean payloads', () => {
-      const client = createMockSocket(undefined, { sub: 'a' }, 'mid');
-      gateway.handleMessage(client, null as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: null`);
-      gateway.handleMessage(client, undefined as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: undefined`);
-      gateway.handleMessage(client, { foo: 'bar' } as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: [object Object]`);
-      gateway.handleMessage(client, 123 as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: 123`);
-      gateway.handleMessage(client, true as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: true`);
-      gateway.handleMessage(client, false as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: false`);
     });
   });
 });

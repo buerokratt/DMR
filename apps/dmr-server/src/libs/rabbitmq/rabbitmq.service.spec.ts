@@ -214,6 +214,47 @@ describe('RabbitMQService', () => {
     expect(deleteQueueMock).toHaveBeenCalledWith('test-queue');
   });
 
+  describe('setupQueueWithoutDLQ', () => {
+    it('should setup queue without DLQ with default TTL', async () => {
+      const queueName = 'test-queue-no-dlq';
+      const result = await service.setupQueueWithoutDLQ(queueName);
+
+      expect(result).toBe(true);
+      expect(assertQueueMock).toHaveBeenCalledWith(queueName, {
+        durable: true,
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': 60000, // default TTL from config
+        },
+      });
+    });
+
+    it('should setup queue without DLQ with custom TTL', async () => {
+      const queueName = 'test-queue-no-dlq-custom';
+      const customTTL = 120000; // 2 minutes
+      const result = await service.setupQueueWithoutDLQ(queueName, customTTL);
+
+      expect(result).toBe(true);
+      expect(assertQueueMock).toHaveBeenCalledWith(queueName, {
+        durable: true,
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': customTTL,
+        },
+      });
+    });
+
+    it('should return false when queue setup fails', async () => {
+      const queueName = 'test-queue-error';
+      const error = new Error('Queue setup failed');
+      assertQueueMock.mockRejectedValueOnce(error);
+
+      const result = await service.setupQueueWithoutDLQ(queueName);
+
+      expect(result).toBe(false);
+    });
+  });
+
   it('should subscribe to a queue and store consumer tag', async () => {
     const testQueue = 'test-subscribe-queue';
     const mockConsumerTag = 'consumer-tag-123';

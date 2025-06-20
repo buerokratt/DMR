@@ -6,8 +6,8 @@ export const CENT_OPS_CONFIG_TOKEN = Symbol('CENT_OPS_CONFIG_TOKEN');
 
 const variables = Utils.validateObject(
   {
-    url: process.env.CENTOPS_CONFIGURATION_URL,
-    cronTime: process.env.CENTOPS_CONFIGURATION_CRON_TIME,
+    url: String(process.env.CENTOPS_CONFIGURATION_URL),
+    cronTime: String(process.env.CENTOPS_CONFIGURATION_CRON_TIME),
   },
   {
     url: Joi.string().uri().required(),

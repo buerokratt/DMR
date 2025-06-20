@@ -14,6 +14,7 @@ const variables = Utils.validateObject(
     managementUIUri: process.env.RABBITMQ_DEFAULT_MANAGEMENT_UI_URI,
     dlqTTL: Number(process.env.RABBITMQ_DEFAULT_DLQ_TTL),
     reconnectInterval: Number(process.env.RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL),
+    validationFailuresTTL: Number(process.env.RABBITMQ_VALIDATION_FAILURES_TTL),
   },
   {
     port: Joi.number().required(),
@@ -21,6 +22,7 @@ const variables = Utils.validateObject(
     password: Joi.string().required(),
     ttl: Joi.number().default(300000),
     dlqTTL: Joi.number().default(86400000),
+    validationFailuresTTL: Joi.number().default(86400000),
     hostname: Joi.string().hostname().required(),
     reconnectInterval: Joi.number().default(5000),
     managementUIUri: Joi.string().uri().required(),
