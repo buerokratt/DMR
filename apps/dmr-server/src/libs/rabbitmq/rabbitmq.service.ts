@@ -1,6 +1,13 @@
 import { AgentMessageDto, DmrServerEvent, IRabbitQueue } from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { HttpService } from '@nestjs/axios';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -230,11 +237,17 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         queueName,
         (message: ConsumeMessage | null): void => {
           try {
-            this.forwardMessageToAgent(queueName, message);
-            this._channel.ack(message);
+            if (message) {
+              this.forwardMessageToAgent(queueName, message);
+              channel.ack(message);
+            } else {
+              this.logger.warn('Message is null');
+            }
           } catch (error) {
             this.logger.error(`Error processing message from queue ${queueName}:`, error);
-            this._channel.nack(message, false, false);
+            if (message) {
+              channel.nack(message, false, false);
+            }
           }
         },
         { noAck: false },
