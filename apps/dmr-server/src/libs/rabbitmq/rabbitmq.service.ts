@@ -1,4 +1,4 @@
-import { IRabbitQueue, IVHost } from '@dmr/shared';
+import { IRabbitQueue } from '@dmr/shared';
 import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -155,52 +155,6 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`Error while setup queue for ${queueName}: ${error.message}`);
       }
 
-      return false;
-    }
-  }
-
-  // Do not use, may break the connection.
-  async checkQueueInAllVHosts(queueName: string): Promise<boolean> {
-    try {
-      const getVHostsURL = `${this.rabbitMQConfig.managementUIUri}/api/vhosts`;
-      const authorization =
-        `Basic ` +
-        Buffer.from(`${this.rabbitMQConfig.username}:${this.rabbitMQConfig.password}`).toString(
-          'base64',
-        );
-
-      const { data: vhosts } = await firstValueFrom(
-        this.httpService.get<IVHost[]>(getVHostsURL, {
-          headers: { Authorization: authorization },
-        }),
-      );
-
-      console.log(vhosts.map((x) => x.name));
-
-      if (vhosts.length <= 0) {
-        return false;
-      }
-
-      for (const vhost of vhosts) {
-        const encodedVhost = encodeURIComponent(vhost.name);
-        const getQueueURL = `${this.rabbitMQConfig.managementUIUri}/api/queues/${encodedVhost}/a${queueName}`;
-
-        console.log(getQueueURL);
-
-        try {
-          const { data: queue } = await firstValueFrom(
-            this.httpService.get<IRabbitQueue>(getQueueURL, {
-              headers: { Authorization: authorization },
-            }),
-          );
-
-          console.log(`Queues in vhost "${vhost.name}":`, queue.name);
-          return true;
-        } catch {
-          continue;
-        }
-      }
-    } catch {
       return false;
     }
   }

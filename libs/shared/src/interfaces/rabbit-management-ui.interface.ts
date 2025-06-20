@@ -24,8 +24,7 @@ export interface IVHost {
   name: string;
   description: string;
   metadata: IMetadata;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tags: any[];
+  tags: unknown[];
   default_queue_type: string;
   protected_from_deletion: boolean;
   tracing: boolean;
@@ -34,8 +33,7 @@ export interface IVHost {
 
 interface IMetadata {
   description: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tags: any[];
+  tags: unknown[];
   default_queue_type: string;
 }
 
