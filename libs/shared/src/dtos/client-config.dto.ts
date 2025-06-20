@@ -3,21 +3,21 @@ import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 export class ClientConfigDto {
   @IsUUID()
   @IsNotEmpty()
-  id: string;
+  id!: string;
 
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsNotEmpty()
-  authenticationCertificate: string;
+  authenticationCertificate!: string;
 
   @IsString()
   @IsNotEmpty()
-  createdAt: string;
+  createdAt!: string;
 
   @IsString()
   @IsNotEmpty()
-  updatedAt: string;
+  updatedAt!: string;
 }

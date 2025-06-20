@@ -4,5 +4,5 @@ import { BaseMessageDto } from './base-message.dto';
 export class AgentEncryptedMessageDto extends BaseMessageDto {
   @IsString()
   @IsNotEmpty()
-  payload: string;
+  payload!: string;
 }

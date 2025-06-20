@@ -6,7 +6,7 @@ export const DMR_SERVER_CONFIG_TOKEN = Symbol('DMR_SERVER_CONFIG_TOKEN');
 
 const variables = Utils.validateObject(
   {
-    webSocketURL: process.env.DMR_SERVER_WEBSOCKET_URL,
+    webSocketURL: String(process.env.DMR_SERVER_WEBSOCKET_URL),
   },
   {
     webSocketURL: Joi.string().uri().required(),

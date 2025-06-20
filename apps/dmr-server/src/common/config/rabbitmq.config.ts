@@ -12,6 +12,7 @@ const variables = Utils.validateObject(
     port: Number(process.env.RABBITMQ_DEFAULT_PORT ?? 5672),
     hostname: process.env.RABBITMQ_DEFAULT_HOST ?? 'localhost',
     dlqTTL: Number(process.env.RABBITMQ_DEFAULT_DLQ_TTL ?? 86400000),
+    validationFailuresTTL: Number(process.env.RABBITMQ_VALIDATION_FAILURES_TTL ?? 86400000),
     reconnectInterval: Number(process.env.RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL ?? 5000),
   },
   {
@@ -20,6 +21,7 @@ const variables = Utils.validateObject(
     password: Joi.string().required(),
     ttl: Joi.number().default(300000),
     dlqTTL: Joi.number().default(86400000),
+    validationFailuresTTL: Joi.number().default(86400000),
     hostname: Joi.string().hostname().required(),
     reconnectInterval: Joi.number().default(5000),
   },
