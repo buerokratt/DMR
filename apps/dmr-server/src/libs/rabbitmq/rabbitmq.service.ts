@@ -129,6 +129,32 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async setupQueueWithoutDLQ(queueName: string, ttl?: number): Promise<boolean> {
+    const channel = this.channel;
+
+    try {
+      await channel.assertQueue(queueName, {
+        durable: true,
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': ttl ?? this.rabbitMQConfig.ttl,
+        },
+      });
+
+      this.logger.log(
+        `Queue ${queueName} with TTL ${ttl ?? this.rabbitMQConfig.ttl}ms set up (no DLQ).`,
+      );
+
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`Error while setting up queue ${queueName}: ${error.message}`);
+      }
+
+      return false;
+    }
+  }
+
   async deleteQueue(queueName: string): Promise<boolean> {
     const channel = this.channel;
 
@@ -153,7 +179,6 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
     const channel = this.channel;
 
