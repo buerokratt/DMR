@@ -3,5 +3,5 @@ export * from './message-type.enum';
 export * from './validation-error-type.enum';
 export * from './app.enum.constant';
 export * from './message-type.enum';
-export * from './cent-ops-event.enum';
+export * from './dmr-server-event.enum';
 export * from './validation-error-type.enum';

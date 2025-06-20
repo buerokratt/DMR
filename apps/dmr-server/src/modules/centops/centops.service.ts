@@ -1,13 +1,18 @@
+import {
+  AgentDto,
+  ClientConfigDto,
+  DmrServerEvent,
+  IGetAgentConfigListResponse,
+} from '@dmr/shared';
 import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { firstValueFrom } from 'rxjs';
-import { AgentDto, CentOpsEvent, ClientConfigDto, IGetAgentConfigListResponse } from '@dmr/shared';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CronJob } from 'cron';
+import { firstValueFrom } from 'rxjs';
 import { CentOpsConfig, centOpsConfig } from '../../common/config';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { CentOpsConfigurationDifference } from './interfaces/cent-ops-configuration-difference.interface';
@@ -115,7 +120,7 @@ export class CentOpsService implements OnModuleInit {
       }
 
       await this.cacheManager.set(this.CENT_OPS_CONFIG_CACHE_KEY, newConfigurations);
-      this.eventEmitter.emit(CentOpsEvent.UPDATED, difference);
+      this.eventEmitter.emit(DmrServerEvent.UPDATED, difference);
       this.logger.log('CentOps configuration updated and stored in memory.');
 
       return newConfigurations;
