@@ -399,7 +399,7 @@ describe('RabbitMQService', () => {
           { noAck: false },
         );
 
-        capturedCallback(mockMessage);
+        capturedCallback!(mockMessage);
 
         expect(forwardSpy).toHaveBeenCalledWith(queueName, mockMessage);
         expect((service as any)._channel.ack).toHaveBeenCalledWith(mockMessage);
@@ -428,7 +428,7 @@ describe('RabbitMQService', () => {
 
         await service.subscribe(queueName);
 
-        capturedCallback(mockMessage);
+        capturedCallback!(mockMessage);
 
         expect((service as any)._channel.ack).not.toHaveBeenCalled();
         expect((service as any)._channel.nack).toHaveBeenCalledWith(mockMessage, false, false);
