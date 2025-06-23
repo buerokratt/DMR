@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentConfig, AgentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 import { AgentsService } from './agents.service';
+import { BadRequestException } from '@nestjs/common';
 
 describe('AgentsService', () => {
   let service: AgentsService;
@@ -148,6 +149,7 @@ describe('AgentsService', () => {
       const message = {
         payload: ['some-data'],
         recipientId: mockRecipient.id,
+        id: 'id',
       };
 
       const result = await service.encryptMessagePayloadFromExternalService(message);
@@ -155,7 +157,7 @@ describe('AgentsService', () => {
       expect(result).toEqual(
         expect.objectContaining({
           id: expect.any(String),
-          type: 'Message',
+          type: MessageType.ChatMessage,
           payload: encryptedPayload,
           recipientId: mockRecipient.id,
           senderId: agentConfigMock.id,
@@ -170,6 +172,7 @@ describe('AgentsService', () => {
       const result = await service.encryptMessagePayloadFromExternalService({
         payload: ['data'],
         recipientId: 'invalid',
+        id: 'id',
       });
 
       expect(result).toBeNull();
@@ -187,6 +190,7 @@ describe('AgentsService', () => {
       const result = await service.encryptMessagePayloadFromExternalService({
         payload: ['data'],
         recipientId: 'recipient-id',
+        id: 'id',
       });
 
       expect(result).toBeNull();
@@ -205,7 +209,7 @@ describe('AgentsService', () => {
 
       const result = await service.decryptMessagePayloadFromDMRServer({
         id: 'id',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: encryptedPayload,
         senderId: mockSender.id,
         recipientId: agentConfigMock.id,
@@ -214,7 +218,7 @@ describe('AgentsService', () => {
 
       expect(result).toEqual({
         id: 'id',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: decryptedPayload.data,
         senderId: mockSender.id,
         recipientId: agentConfigMock.id,
@@ -227,7 +231,7 @@ describe('AgentsService', () => {
 
       const result = await service.decryptMessagePayloadFromDMRServer({
         id: 'id',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: 'payload',
         senderId: 'invalid-id',
         recipientId: agentConfigMock.id,
@@ -248,7 +252,7 @@ describe('AgentsService', () => {
 
       const result = await service.decryptMessagePayloadFromDMRServer({
         id: 'id',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: encryptedPayload,
         senderId: mockSender.id,
         recipientId: agentConfigMock.id,
@@ -256,6 +260,41 @@ describe('AgentsService', () => {
       });
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('sendEncryptedMessageToServer', () => {
+    const message = {
+      id: 'msg-id',
+      recipientId: 'recipient-id',
+      payload: ['test-payload'],
+    };
+
+    it('should log success if message is encrypted and sent', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue({
+        id: 'msg-id',
+        type: MessageType.ChatMessage,
+        payload: 'encrypted-payload',
+        recipientId: 'recipient-id',
+        senderId: agentConfigMock.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      const loggerSpy = vi.spyOn(service['logger'], 'log');
+
+      await service.sendEncryptedMessageToServer(message);
+
+      expect(loggerSpy).toHaveBeenCalledWith('Message encrypted successfully');
+    });
+
+    it('should throw BadRequestException if encryption fails', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(null);
+      const loggerErrorSpy = vi.spyOn(service['logger'], 'error');
+
+      await expect(service.sendEncryptedMessageToServer(message)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(loggerErrorSpy).toHaveBeenCalledWith('Message not encrypted');
     });
   });
 });

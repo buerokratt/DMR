@@ -13,7 +13,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 
@@ -153,6 +153,17 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
+  async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
+    const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
+
+    if (!encryptedMessage) {
+      this.logger.error('Message not encrypted');
+      throw new BadRequestException('Message not encrypted');
+    }
+
+    this.logger.log(`Message encrypted successfully`);
+  }
+
   async encryptMessagePayloadFromExternalService(
     message: ExternalServiceMessageDto,
   ): Promise<AgentEncryptedMessageDto | null> {
@@ -173,7 +184,7 @@ export class AgentsService implements OnModuleInit {
 
       const encryptedMessage: AgentEncryptedMessageDto = {
         id: uuid,
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: encryptedPayload,
         recipientId: recipient.id,
         senderId: this.agentConfig.id,
