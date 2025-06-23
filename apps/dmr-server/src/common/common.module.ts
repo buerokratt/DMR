@@ -4,7 +4,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { PrometheusModule } from '@willsoto/nestjs-prometheus';
+import { MetricModule } from '../libs/metrics';
 import { configs } from './config';
 
 @Module({
@@ -26,10 +26,7 @@ import { configs } from './config';
     }),
     HttpModule.register({ global: true }),
     EventEmitterModule.forRoot({ global: true }),
-    PrometheusModule.register({
-      path: '/metrics',
-      defaultMetrics: { enabled: false },
-    }),
+    MetricModule,
   ],
 })
 export class CommonModule {}

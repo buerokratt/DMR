@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Server, Socket } from 'socket.io';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Metrics } from '../../common/metrics';
+import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
 import { AuthService } from '../auth/auth.service';
@@ -40,6 +40,17 @@ const mockRabbitMQService = {
   unsubscribe: vi.fn(),
 };
 
+const mockMetricService = {
+  errorsTotalCounter: mockCounter,
+  activeConnectionGauge: mockGauge,
+  connectionsTotalCounter: mockCounter,
+  disconnectionsTotalCounter: mockCounter,
+  eventsReceivedTotalCounter: mockCounter,
+  eventsSentTotalCounter: mockCounter,
+  socketConnectionDurationSecondsHistogram: mockHistogram,
+  messageProcessingDurationSecondsHistogram: mockHistogram,
+};
+
 const mockRabbitMQMessageService = {
   sendValidMessage: vi.fn(),
   sendValidationFailure: vi.fn(),
@@ -59,7 +70,7 @@ describe('AgentGateway', () => {
   let rabbitService: RabbitMQService;
   let centOpsService: CentOpsService;
   let messageValidatorService: MessageValidatorService;
-  let rabbitMQMessageService: any;
+  let rabbitMQMessageService: RabbitMQMessageService;
   let loggerSpy: ReturnType<typeof vi.spyOn>;
   let loggerErrorSpy: ReturnType<typeof vi.spyOn>;
   let serverMock: Server;
@@ -82,6 +93,8 @@ describe('AgentGateway', () => {
       agent: agentPayload || undefined,
       emit: vi.fn(),
       on: vi.fn(),
+      onAny: vi.fn(),
+      onAnyOutgoing: vi.fn(),
       off: vi.fn(),
       once: vi.fn(),
       removeAllListeners: vi.fn(),
@@ -91,20 +104,15 @@ describe('AgentGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [],
       providers: [
         AgentGateway,
         { provide: AuthService, useValue: mockAuthService },
         { provide: RabbitMQService, useValue: mockRabbitMQService },
         { provide: MessageValidatorService, useValue: mockMessageValidatorService },
         { provide: CentOpsService, useValue: mockCentOpsService },
-        { provide: Metrics.dmrSocketErrorsTotal, useValue: mockCounter },
-        { provide: Metrics.dmrSocketConnectionsActive, useValue: mockGauge },
-        { provide: Metrics.dmrSocketConnectionsTotal, useValue: mockCounter },
-        { provide: Metrics.dmrSocketDisconnectionsTotal, useValue: mockCounter },
-        { provide: Metrics.dmrSocketEventsReceivedTotal, useValue: mockCounter },
-        { provide: Metrics.dmrSocketEventsSentTotal, useValue: mockCounter },
-        { provide: Metrics.dmrSocketConnectionDurationSeconds, useValue: mockHistogram },
-        { provide: Metrics.dmrMessageProcessingDurationSeconds, useValue: mockHistogram },
+        { provide: RabbitMQMessageService, useValue: mockRabbitMQMessageService },
+        { provide: MetricService, useValue: mockMetricService },
       ],
     }).compile();
 
@@ -126,6 +134,7 @@ describe('AgentGateway', () => {
       },
       emit: vi.fn(),
       on: vi.fn(),
+      off: vi.fn(),
     } as any as Server;
 
     (serverMock as any).setMockSockets = (socketsArray: [string, Socket][]) => {
@@ -142,8 +151,8 @@ describe('AgentGateway', () => {
   });
 
   afterEach(() => {
-    loggerSpy.mockRestore();
-    loggerErrorSpy.mockRestore();
+    // loggerSpy.mockRestore();
+    // loggerErrorSpy.mockRestore();
     vi.restoreAllMocks();
   });
 

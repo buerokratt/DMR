@@ -16,10 +16,8 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { InjectMetric } from '@willsoto/nestjs-prometheus';
-import { Counter, Gauge, Histogram } from 'prom-client';
 import { Server, Socket } from 'socket.io';
-import { Metrics } from '../../common/metrics';
+import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
 import { AuthService } from '../auth/auth.service';
@@ -43,27 +41,12 @@ export class AgentGateway
   private handleError: (socket: Socket) => void = () => null;
 
   constructor(
-    @InjectMetric(Metrics.dmrSocketErrorsTotal)
-    private readonly errorsTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketConnectionsActive)
-    private readonly activeConnectionGauge: Gauge<string>,
-    @InjectMetric(Metrics.dmrSocketConnectionsTotal)
-    private readonly connectionsTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketDisconnectionsTotal)
-    private readonly disconnectionsTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketEventsReceivedTotal)
-    private readonly eventsReceivedTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketEventsSentTotal)
-    private readonly eventsSentTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketConnectionDurationSeconds)
-    private readonly socketConnectionDurationSecondsHistogram: Histogram<string>,
-    @InjectMetric(Metrics.dmrMessageProcessingDurationSeconds)
-    private readonly messageProcessingDurationSeconds: Histogram<string>,
     private readonly authService: AuthService,
     private readonly rabbitService: RabbitMQService,
     private readonly messageValidator: MessageValidatorService,
     private readonly rabbitMQMessageService: RabbitMQMessageService,
     private readonly centOpsService: CentOpsService,
+    private readonly metricService: MetricService,
   ) {}
 
   onModuleInit() {
@@ -72,24 +55,24 @@ export class AgentGateway
 
       socket.onAny((event: string) => {
         if (event === 'error') {
-          this.errorsTotalCounter.inc(1);
+          this.metricService.errorsTotalCounter.inc(1);
         }
 
         const ignored = ['ping', 'disconnect', 'connect', 'error'];
         if (!ignored.includes(event)) {
-          this.eventsReceivedTotalCounter.inc({ event, namespace });
+          this.metricService.eventsReceivedTotalCounter.inc({ event, namespace });
         }
       });
 
       socket.onAnyOutgoing((event: string) => {
-        this.eventsSentTotalCounter.inc({ event, namespace: '/' });
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
       });
     };
 
     this.server.on('connection', this.handleError);
 
     const emit = (event: string, ...arguments_: unknown[]) => {
-      this.eventsSentTotalCounter.inc({ event, namespace: '/' });
+      this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
 
       return this.server.emit(event, ...arguments_);
     };
@@ -117,8 +100,8 @@ export class AgentGateway
       const centOpsConfigurations = await this.centOpsService.getCentOpsConfigurations();
       this.server.emit(AgentEventNames.FULL_AGENT_LIST, centOpsConfigurations);
 
-      this.activeConnectionGauge.inc(1);
-      this.connectionsTotalCounter.inc(1);
+      this.metricService.activeConnectionGauge.inc(1);
+      this.metricService.connectionsTotalCounter.inc(1);
 
       Object.assign(client, { agent: Object.assign(jwtPayload, { connectedAt: Date.now() }) });
     } catch {
@@ -128,8 +111,8 @@ export class AgentGateway
   }
 
   async handleDisconnect(@ConnectedSocket() client: Socket): Promise<void> {
-    this.activeConnectionGauge.dec(1);
-    this.disconnectionsTotalCounter.inc(1);
+    this.metricService.activeConnectionGauge.dec(1);
+    this.metricService.disconnectionsTotalCounter.inc(1);
 
     const agentId = client?.agent?.sub;
     const connectedAt = client?.agent?.cat;
@@ -141,7 +124,7 @@ export class AgentGateway
     if (connectedAt) {
       const durationSeconds = (Date.now() - connectedAt) / 1000;
 
-      this.socketConnectionDurationSecondsHistogram.observe(durationSeconds);
+      this.metricService.socketConnectionDurationSecondsHistogram.observe(durationSeconds);
     }
 
     this.logger.log(`Agent disconnected: ${agentId} (Socket ID: ${client.id})`);
@@ -187,7 +170,7 @@ export class AgentGateway
     @MessageBody() data: unknown,
   ): Promise<void> {
     const receivedAt = new Date().toISOString();
-    const end = this.messageProcessingDurationSeconds.startTimer({
+    const end = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
       event: AgentEventNames.MESSAGE_TO_DMR_SERVER,
     });
 
