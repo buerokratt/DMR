@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from '../auth/auth.service';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
 import { CentOpsService } from '../centops/centops.service';
@@ -15,6 +14,7 @@ import {
   ValidationErrorType,
   MessageType,
 } from '@dmr/shared';
+import { AuthService } from '../auth/auth.service';
 
 declare module 'socket.io' {
   interface Socket {
@@ -87,8 +87,8 @@ describe('AgentGateway', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: RabbitMQService, useValue: mockRabbitMQService },
         { provide: MessageValidatorService, useValue: mockMessageValidatorService },
-        { provide: CentOpsService, useValue: mockCentOpsService },
         { provide: RabbitMQMessageService, useValue: mockRabbitMQMessageService },
+        { provide: CentOpsService, useValue: mockCentOpsService },
       ],
     }).compile();
 
