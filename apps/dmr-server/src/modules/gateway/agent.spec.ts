@@ -151,8 +151,6 @@ describe('AgentGateway', () => {
   });
 
   afterEach(() => {
-    // loggerSpy.mockRestore();
-    // loggerErrorSpy.mockRestore();
     vi.restoreAllMocks();
   });
 

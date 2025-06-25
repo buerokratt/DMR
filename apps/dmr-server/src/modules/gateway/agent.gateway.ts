@@ -38,7 +38,7 @@ export class AgentGateway
   server!: Server;
 
   private readonly logger = new Logger(AgentGateway.name);
-  private handleError: (socket: Socket) => void = () => null;
+  private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
     private readonly authService: AuthService,
@@ -50,7 +50,7 @@ export class AgentGateway
   ) {}
 
   onModuleInit() {
-    this.handleError = (socket: Socket) => {
+    this.handleConnectionEvent = (socket: Socket) => {
       const namespace = socket.nsp.name;
 
       socket.onAny((event: string) => {
@@ -69,7 +69,7 @@ export class AgentGateway
       });
     };
 
-    this.server.on('connection', this.handleError);
+    this.server.on('connection', this.handleConnectionEvent);
 
     const emit = (event: string, ...arguments_: unknown[]) => {
       this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
@@ -81,7 +81,7 @@ export class AgentGateway
   }
 
   onModuleDestroy() {
-    this.server.off('connection', this.handleError);
+    this.server.off('connection', this.handleConnectionEvent);
   }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {
@@ -103,7 +103,7 @@ export class AgentGateway
       this.metricService.activeConnectionGauge.inc(1);
       this.metricService.connectionsTotalCounter.inc(1);
 
-      Object.assign(client, { agent: Object.assign(jwtPayload, { connectedAt: Date.now() }) });
+      Object.assign(client, { agent: Object.assign(jwtPayload, { cat: Date.now() }) });
     } catch {
       this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
       client.disconnect();

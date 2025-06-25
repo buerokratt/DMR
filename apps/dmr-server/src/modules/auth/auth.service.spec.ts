@@ -1,10 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from './auth.service';
-import { CentOpsService } from '../centops/centops.service';
-import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from '@dmr/shared';
-import { Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
-import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
+import { BadRequestException, Logger, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Test, TestingModule } from '@nestjs/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CentOpsService } from '../centops/centops.service';
+import { AuthService } from './auth.service';
 
 const mockCentOpsService = {
   getCentOpsConfigurationByClientId: vi.fn(),
@@ -45,9 +45,7 @@ describe('AuthService', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    loggerSpy.mockRestore();
-  });
+  afterEach(() => {});
 
   it('should be defined', () => {
     expect(authService).toBeDefined();
