@@ -6,7 +6,14 @@ import {
 } from '@dmr/shared';
 import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { plainToInstance } from 'class-transformer';
@@ -28,6 +35,7 @@ export class CentOpsService implements OnModuleInit {
     @Inject(centOpsConfig.KEY)
     private readonly centOpsConfig: CentOpsConfig,
     private readonly httpService: HttpService,
+    @Inject(forwardRef(() => RabbitMQService))
     private readonly rabbitMQService: RabbitMQService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly eventEmitter: EventEmitter2,

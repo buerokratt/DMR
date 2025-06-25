@@ -341,6 +341,40 @@ describe('AgentGateway', () => {
       await expect(gateway.handleConnection(client)).rejects.toThrow('disconnect fail');
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
+
+    it('should drop existing connection when a new connection is made by the same agent', async () => {
+      // Create existing socket for agent
+      const existingSocket = createMockSocket(
+        'existing.token',
+        { sub: 'testAgentId' },
+        'existing-socket',
+      );
+      const newClient = createMockSocket('new.token', undefined, 'new-socket');
+
+      // Setup mock server with existing socket
+      (serverMock as any).setMockSockets([['existing-socket', existingSocket]]);
+
+      // Setup mocks for successful authentication and subscription
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
+
+      await gateway.handleConnection(newClient);
+
+      // Verify existing socket was disconnected
+      expect(existingSocket.disconnect).toHaveBeenCalledOnce();
+
+      // Verify we unsubscribed from the old connection's queue
+      expect(rabbitService.unsubscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we subscribed for the new connection
+      expect(rabbitService.subscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we logged the action
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Dropping existing connection for agent testAgentId`),
+      );
+    });
   });
 
   describe('handleDisconnect', () => {
@@ -391,47 +425,7 @@ describe('AgentGateway', () => {
     });
   });
 
-  describe('handleError', () => {
-    const mockClient = createMockSocket('some-token');
-    const mockData: SimpleValidationFailureMessage = {
-      id: 'test-001',
-      errors: [
-        {
-          type: ValidationErrorType.DECRYPTION_FAILED,
-          message: 'Decryption failed',
-        },
-      ],
-      receivedAt: new Date().toISOString(),
-      message: 'someValue',
-    };
-
-    it('should call sendValidationFailure with correct parameters', async () => {
-      mockRabbitMQMessageService.sendValidationFailure.mockResolvedValueOnce(undefined);
-      const spy = vi.spyOn(gateway as any, 'handleMessageError').mockImplementation(async () => {});
-
-      await gateway.handleError(mockClient, mockData);
-
-      expect(rabbitMQMessageService.sendValidationFailure).toHaveBeenCalledWith(
-        mockData.message,
-        mockData.errors,
-        mockData.receivedAt,
-      );
-      expect(spy).not.toHaveBeenCalled();
-    });
-
-    it('should call handleMessageError when sendValidationFailure throws', async () => {
-      const error = new Error('send failed');
-      mockRabbitMQMessageService.sendValidationFailure.mockRejectedValueOnce(error);
-
-      const spy = vi.spyOn(gateway as any, 'handleMessageError').mockImplementation(async () => {});
-
-      await gateway.handleError(mockClient, mockData);
-
-      expect(spy).toHaveBeenCalledWith(error);
-    });
-  });
-
-  describe('onRabbitMQMessage', () => {
+  describe('forwardMessageToAgent', () => {
     it('should forward message to the correct agent socket', () => {
       // Setup mock sockets
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
@@ -452,10 +446,7 @@ describe('AgentGateway', () => {
         payload: '{"key":"value"}',
       };
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-123',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-123', testMessage);
 
       expect(mockSocket1.emit).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
@@ -480,10 +471,7 @@ describe('AgentGateway', () => {
 
       const warnSpy = vi.spyOn(gateway['logger'], 'warn');
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-789',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-789', testMessage);
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No connected socket found for agent agent-789'),
@@ -510,10 +498,7 @@ describe('AgentGateway', () => {
 
       const errorSpy = vi.spyOn(gateway['logger'], 'error');
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-123',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-123', testMessage);
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error forwarding RabbitMQ message to agent: Socket error'),

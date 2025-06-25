@@ -6,7 +6,7 @@ import {
   SimpleValidationFailureMessage,
   ValidationErrorDto,
 } from '@dmr/shared';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, forwardRef, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -26,6 +26,7 @@ import { CentOpsConfigurationDifference } from '../centops/interfaces/cent-ops-c
 import { MessageValidatorService } from './message-validator.service';
 
 @WebSocketGateway({
+  namespace: '/v1/dmr-agent-events',
   connectionStateRecovery: {
     maxDisconnectionDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION || '120000'),
     skipMiddlewares: true,
@@ -39,8 +40,10 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   constructor(
     private readonly authService: AuthService,
+    @Inject(forwardRef(() => RabbitMQService))
     private readonly rabbitService: RabbitMQService,
     private readonly messageValidator: MessageValidatorService,
+    @Inject(forwardRef(() => RabbitMQMessageService))
     private readonly rabbitMQMessageService: RabbitMQMessageService,
     private readonly centOpsService: CentOpsService,
   ) {}
@@ -52,16 +55,27 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const jwtPayload = await this.authService.verifyToken(token);
 
+      Object.assign(client, { agent: jwtPayload });
+
+      const existingSocket = this.findSocketByAgentId(jwtPayload.sub);
+      if (existingSocket && existingSocket.id !== client.id) {
+        this.logger.log(
+          `Dropping existing connection for agent ${jwtPayload.sub} (Socket ID: ${existingSocket.id}) in favor of new connection (Socket ID: ${client.id})`,
+        );
+        existingSocket.disconnect();
+
+        await this.rabbitService.unsubscribe(jwtPayload.sub);
+      }
+
       const consume = await this.rabbitService.subscribe(jwtPayload.sub);
 
       if (!consume) {
         client.disconnect();
+        return;
       }
 
       const centOpsConfigurations = await this.centOpsService.getCentOpsConfigurations();
       this.server.emit(AgentEventNames.FULL_AGENT_LIST, centOpsConfigurations);
-
-      Object.assign(client, { agent: jwtPayload });
     } catch {
       this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
       client.disconnect();
@@ -85,10 +99,8 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log('Agent configurations updated and emitted to all connected clients');
   }
 
-  @OnEvent(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT)
-  onRabbitMQMessage(payload: { agentId: string; message: AgentEncryptedMessageDto }): void {
+  public forwardMessageToAgent(agentId: string, message: AgentMessageDto): void {
     try {
-      const { agentId, message } = payload;
       const socket = this.findSocketByAgentId(agentId);
       if (!socket) {
         this.logger.warn(`No connected socket found for agent ${agentId}`);
