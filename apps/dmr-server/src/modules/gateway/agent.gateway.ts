@@ -142,15 +142,11 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SimpleValidationFailureMessage,
   ) {
-    try {
-      await this.rabbitMQMessageService.sendValidationFailure(
-        data.message,
-        data.errors,
-        data.receivedAt,
-      );
-    } catch (error: unknown) {
-      await this.handleMessageError(error);
-    }
+    await this.rabbitMQMessageService.sendValidationFailure(
+      data.message,
+      data.errors,
+      data.receivedAt,
+    );
   }
 
   private async handleValidMessage(
