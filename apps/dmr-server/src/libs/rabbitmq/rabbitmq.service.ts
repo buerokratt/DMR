@@ -7,7 +7,6 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
-  BadRequestException
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -202,8 +201,6 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
-    const channel = this.channel;
-
     try {
       const base64 = Buffer.from(
         `${this.rabbitMQConfig.username}:${this.rabbitMQConfig.password}`,
