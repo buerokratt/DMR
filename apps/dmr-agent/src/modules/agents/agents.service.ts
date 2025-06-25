@@ -3,6 +3,7 @@ import {
   AgentDto,
   AgentEncryptedMessageDto,
   AgentEventNames,
+  AgentMessageDto,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
@@ -57,7 +58,7 @@ export class AgentsService implements OnModuleInit {
       void this.handlePartialAgentListEvent(data);
     });
 
-    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentEncryptedMessageDto) => {
+    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentMessageDto) => {
       void this.handleMessageFromDMRServerEvent(data);
     });
   }
@@ -126,7 +127,7 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
-  private async handleMessageFromDMRServerEvent(message: AgentEncryptedMessageDto): Promise<void> {
+  private async handleMessageFromDMRServerEvent(message: AgentMessageDto): Promise<void> {
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 

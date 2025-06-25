@@ -1,13 +1,20 @@
-import { AgentMessageDto, DmrServerEvent, IRabbitQueue } from '@dmr/shared';
+import { AgentMessageDto, IRabbitQueue } from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as rabbit from 'amqplib';
 import { ConsumeMessage } from 'amqplib';
 import { firstValueFrom } from 'rxjs';
 import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
+import { AgentGateway } from '../../modules/gateway';
 
 @Injectable()
 export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
@@ -23,7 +30,8 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly httpService: HttpService,
-    private readonly eventEmitter: EventEmitter2,
+    @Inject(forwardRef(() => AgentGateway))
+    private readonly agentGateway: AgentGateway,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -191,6 +199,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
     try {
       const base64 = Buffer.from(
@@ -230,11 +239,17 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         queueName,
         (message: ConsumeMessage | null): void => {
           try {
-            this.forwardMessageToAgent(queueName, message);
-            this._channel.ack(message);
+            if (message) {
+              this.forwardMessageToAgent(queueName, message);
+              channel.ack(message);
+            } else {
+              this.logger.warn('Message is null');
+            }
           } catch (error) {
             this.logger.error(`Error processing message from queue ${queueName}:`, error);
-            this._channel.nack(message, false, false);
+            if (message) {
+              channel.nack(message, false, false);
+            }
           }
         },
         { noAck: false },
@@ -256,10 +271,8 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     try {
       const messageContent = message.content.toString();
       const parsedMessage = JSON.parse(messageContent) as AgentMessageDto;
-      this.eventEmitter.emit(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT, {
-        agentId,
-        message: parsedMessage,
-      });
+
+      this.agentGateway.forwardMessageToAgent(agentId, parsedMessage);
       this.logger.log(`Message forwarded to agent ${agentId}`);
     } catch (error) {
       if (error instanceof Error) {

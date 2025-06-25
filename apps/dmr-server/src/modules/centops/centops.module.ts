@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { CentOpsService } from './centops.service';
 import { RabbitMQModule } from '../../libs/rabbitmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
-  imports: [RabbitMQModule],
+  imports: [forwardRef(() => RabbitMQModule)],
   providers: [CentOpsService],
   exports: [CentOpsService],
 })
