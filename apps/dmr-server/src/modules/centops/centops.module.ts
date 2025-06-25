@@ -1,8 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 
-import { CentOpsService } from './centops.service';
 import { RabbitMQModule } from '../../libs/rabbitmq';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { CentOpsService } from './centops.service';
 
 @Module({
   imports: [forwardRef(() => RabbitMQModule)],
