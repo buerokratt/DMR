@@ -214,8 +214,6 @@ describe('AgentGateway', () => {
     it('should disconnect client and log error if no token', async () => {
       const client = createMockSocket(undefined);
 
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
-
       await gateway.handleConnection(client);
 
       expect(authService.verifyToken).toHaveBeenCalledWith(undefined);

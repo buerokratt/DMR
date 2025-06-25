@@ -92,6 +92,8 @@ export class AgentGateway
 
       const jwtPayload = await this.authService.verifyToken(token);
 
+      Object.assign(client, { agent: jwtPayload });
+
       const existingSocket = this.findSocketByAgentId(jwtPayload.sub);
       if (existingSocket && existingSocket.id !== client.id) {
         this.logger.log(
@@ -114,8 +116,6 @@ export class AgentGateway
 
       this.metricService.activeConnectionGauge.inc(1);
       this.metricService.connectionsTotalCounter.inc(1);
-
-      Object.assign(client, { agent: jwtPayload });
     } catch {
       this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
       client.disconnect();
