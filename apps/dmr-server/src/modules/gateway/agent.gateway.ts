@@ -1,18 +1,24 @@
 import {
-  WebSocketGateway,
-  SubscribeMessage,
-  MessageBody,
   ConnectedSocket,
-  WebSocketServer,
-  OnGatewayDisconnect,
+  MessageBody,
   OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { CentOpsService } from '../centops/centops.service';
-import { AgentEventNames, CentOpsEvent } from '@dmr/shared';
+import {
+  AgentEncryptedMessageDto,
+  AgentEventNames,
+  CentOpsEvent,
+  SocketAckResponse,
+  SocketActEnum,
+} from '@dmr/shared';
 import { OnEvent } from '@nestjs/event-emitter';
 import { CentOpsConfigurationDifference } from '../centops/interfaces/cent-ops-configuration-difference.interface';
 
@@ -72,6 +78,34 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit(AgentEventNames.PARTIAL_AGENT_LIST, [...data.added, ...data.deleted]);
 
     this.logger.log('Agent configurations updated and emitted to all connected clients');
+  }
+
+  @SubscribeMessage(AgentEventNames.MESSAGE_TO_DMR_SERVER)
+  handleMessageFromDMRAgent(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() message: AgentEncryptedMessageDto,
+  ): SocketAckResponse {
+    const agentId = client?.agent?.sub;
+
+    try {
+      if (!agentId) {
+        this.logger.error(`Client not authenticated: ${client.id}`);
+        return { status: SocketActEnum.ERROR, error: 'Unauthorized client' };
+      }
+
+      const queueName = agentId;
+
+      this.rabbitService.channel.sendToQueue(queueName, Buffer.from(JSON.stringify(message)), {
+        persistent: true,
+      });
+
+      this.logger.log(`Message from agent ${agentId} forwarded to queue: ${queueName}`);
+      return { status: SocketActEnum.OK };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error processing message from ${agentId}: ${message}`);
+      return { status: SocketActEnum.ERROR, error: message };
+    }
   }
 
   @SubscribeMessage('messageToDMR')

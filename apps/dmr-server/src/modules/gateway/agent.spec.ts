@@ -5,7 +5,7 @@ import { CentOpsService } from '../centops/centops.service';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
-import { JwtPayload } from '@dmr/shared';
+import { AgentEncryptedMessageDto, JwtPayload, MessageType } from '@dmr/shared';
 import { AgentGateway } from './agent.gateway';
 import { AgentEventNames } from '@dmr/shared';
 
@@ -22,6 +22,9 @@ const mockAuthService = {
 const mockRabbitMQService = {
   subscribe: vi.fn(),
   unsubscribe: vi.fn(),
+  channel: {
+    sendToQueue: vi.fn(),
+  },
 };
 
 const mockCentOpsService = {
@@ -380,6 +383,77 @@ describe('AgentGateway', () => {
       expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: true`);
       gateway.handleMessage(client, false as any);
       expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: false`);
+    });
+  });
+
+  describe('handleMessageFromDMRAgent', () => {
+    const agentId = 'agent-789';
+    const mockClient = createMockSocket(undefined, { sub: agentId });
+    const message: AgentEncryptedMessageDto = {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      senderId: agentId,
+      recipientId: 'recipient-abc',
+      type: MessageType.ChatMessage,
+      payload: 'secret',
+    };
+
+    beforeEach(() => {
+      mockRabbitMQService.channel = {
+        sendToQueue: vi.fn(),
+      };
+    });
+
+    it('should send message to the correct queue and return OK status', () => {
+      const result = gateway.handleMessageFromDMRAgent(mockClient, message);
+
+      expect(mockRabbitMQService.channel.sendToQueue).toHaveBeenCalledWith(
+        agentId,
+        Buffer.from(JSON.stringify(message)),
+        { persistent: true },
+      );
+
+      expect(result).toEqual({ status: 'ok' });
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Message from agent ${agentId} forwarded to queue: ${agentId}`,
+      );
+    });
+
+    it('should return error if agent ID is missing', () => {
+      const clientWithoutAgent = createMockSocket(undefined, undefined);
+      const result = gateway.handleMessageFromDMRAgent(clientWithoutAgent, message);
+
+      expect(result).toEqual({ status: 'error', error: 'Unauthorized client' });
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        `Client not authenticated: ${clientWithoutAgent.id}`,
+      );
+    });
+
+    it('should handle exceptions from sendToQueue', () => {
+      const errorMessage = 'Queue failure';
+      mockRabbitMQService.channel.sendToQueue = vi.fn(() => {
+        throw new Error(errorMessage);
+      });
+
+      const result = gateway.handleMessageFromDMRAgent(mockClient, message);
+
+      expect(result).toEqual({ status: 'error', error: errorMessage });
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        `Error processing message from ${agentId}: ${errorMessage}`,
+      );
+    });
+
+    it('should handle non-Error exceptions from sendToQueue', () => {
+      mockRabbitMQService.channel.sendToQueue = vi.fn(() => {
+        throw 'string error';
+      });
+
+      const result = gateway.handleMessageFromDMRAgent(mockClient, message);
+
+      expect(result).toEqual({ status: 'error', error: 'string error' });
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        `Error processing message from ${agentId}: string error`,
+      );
     });
   });
 });
