@@ -365,6 +365,40 @@ describe('AgentGateway', () => {
       await expect(gateway.handleConnection(client)).rejects.toThrow('disconnect fail');
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
+
+    it('should drop existing connection when a new connection is made by the same agent', async () => {
+      // Create existing socket for agent
+      const existingSocket = createMockSocket(
+        'existing.token',
+        { sub: 'testAgentId' },
+        'existing-socket',
+      );
+      const newClient = createMockSocket('new.token', undefined, 'new-socket');
+
+      // Setup mock server with existing socket
+      (serverMock as any).setMockSockets([['existing-socket', existingSocket]]);
+
+      // Setup mocks for successful authentication and subscription
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
+
+      await gateway.handleConnection(newClient);
+
+      // Verify existing socket was disconnected
+      expect(existingSocket.disconnect).toHaveBeenCalledOnce();
+
+      // Verify we unsubscribed from the old connection's queue
+      expect(rabbitService.unsubscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we subscribed for the new connection
+      expect(rabbitService.subscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we logged the action
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Dropping existing connection for agent testAgentId`),
+      );
+    });
   });
 
   describe('handleDisconnect', () => {
