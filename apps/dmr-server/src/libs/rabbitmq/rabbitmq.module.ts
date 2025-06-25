@@ -1,11 +1,11 @@
-import { Module } from '@nestjs/common';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { RabbitMQMessageService } from './rabbitmq-message.service';
 import { RabbitMQService } from './rabbitmq.service';
+import { GatewayModule } from '../../modules/gateway';
 
 @Module({
-  imports: [EventEmitterModule.forRoot()],
+  imports: [forwardRef(() => GatewayModule)],
   providers: [RabbitMQService, RabbitMQMessageService],
   exports: [RabbitMQService, RabbitMQMessageService],
 })

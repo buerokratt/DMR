@@ -1,11 +1,12 @@
+import { AgentEventNames, AgentMessageDto, DmrServerEvent, ValidationErrorDto } from '@dmr/shared';
 import {
-  AgentEncryptedMessageDto,
-  AgentEventNames,
-  AgentMessageDto,
-  DmrServerEvent,
-  ValidationErrorDto,
-} from '@dmr/shared';
-import { BadRequestException, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -43,8 +44,10 @@ export class AgentGateway
 
   constructor(
     private readonly authService: AuthService,
+    @Inject(forwardRef(() => RabbitMQService))
     private readonly rabbitService: RabbitMQService,
     private readonly messageValidator: MessageValidatorService,
+    @Inject(forwardRef(() => RabbitMQMessageService))
     private readonly rabbitMQMessageService: RabbitMQMessageService,
     private readonly centOpsService: CentOpsService,
     private readonly metricService: MetricService,
@@ -149,10 +152,8 @@ export class AgentGateway
     this.logger.log('Agent configurations updated and emitted to all connected clients');
   }
 
-  @OnEvent(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT)
-  onRabbitMQMessage(payload: { agentId: string; message: AgentEncryptedMessageDto }): void {
+  public forwardMessageToAgent(agentId: string, message: AgentMessageDto): void {
     try {
-      const { agentId, message } = payload;
       const socket = this.findSocketByAgentId(agentId);
       if (!socket) {
         this.logger.warn(`No connected socket found for agent ${agentId}`);

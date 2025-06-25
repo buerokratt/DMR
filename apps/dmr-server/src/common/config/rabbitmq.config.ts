@@ -6,12 +6,12 @@ export const RABBITMQ_CONFIG_TOKEN = Symbol('RABBITMQ_CONFIG_TOKEN');
 
 const variables = Utils.validateObject(
   {
-    username: process.env.RABBITMQ_DEFAULT_USER,
-    password: process.env.RABBITMQ_DEFAULT_PASS,
+    username: String(process.env.RABBITMQ_DEFAULT_USER),
+    password: String(process.env.RABBITMQ_DEFAULT_PASS),
     ttl: Number(process.env.RABBITMQ_DEFAULT_TTL),
     port: Number(process.env.RABBITMQ_DEFAULT_PORT),
-    hostname: process.env.RABBITMQ_DEFAULT_HOST,
-    managementUIUri: process.env.RABBITMQ_DEFAULT_MANAGEMENT_UI_URI,
+    hostname: String(process.env.RABBITMQ_DEFAULT_HOST),
+    managementUIUri: String(process.env.RABBITMQ_DEFAULT_MANAGEMENT_UI_URI),
     dlqTTL: Number(process.env.RABBITMQ_DEFAULT_DLQ_TTL),
     reconnectInterval: Number(process.env.RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL),
     validationFailuresTTL: Number(process.env.RABBITMQ_VALIDATION_FAILURES_TTL),

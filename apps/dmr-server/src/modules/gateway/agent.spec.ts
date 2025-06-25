@@ -449,7 +449,7 @@ describe('AgentGateway', () => {
     });
   });
 
-  describe('onRabbitMQMessage', () => {
+  describe('forwardMessageToAgent', () => {
     it('should forward message to the correct agent socket', () => {
       // Setup mock sockets
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
@@ -470,10 +470,7 @@ describe('AgentGateway', () => {
         payload: '{"key":"value"}',
       };
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-123',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-123', testMessage);
 
       expect(mockSocket1.emit).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
@@ -498,10 +495,7 @@ describe('AgentGateway', () => {
 
       const warnSpy = vi.spyOn(gateway['logger'], 'warn');
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-789',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-789', testMessage);
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No connected socket found for agent agent-789'),
@@ -528,10 +522,7 @@ describe('AgentGateway', () => {
 
       const errorSpy = vi.spyOn(gateway['logger'], 'error');
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-123',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-123', testMessage);
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error forwarding RabbitMQ message to agent: Socket error'),
