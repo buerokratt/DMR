@@ -99,7 +99,7 @@ List of metrics:
 * **`dmr_message_processing_duration_seconds`** | `histogram`
   Time to process/forward a single message
 
-  Suggested alert rules:
+Suggested alert rules:
 
  Too many disconnected clients suddenly (spike detection)
 - alert: DMRHighDisconnectionRate
