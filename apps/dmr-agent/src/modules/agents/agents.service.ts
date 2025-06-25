@@ -57,8 +57,8 @@ export class AgentsService implements OnModuleInit {
       void this.handlePartialAgentListEvent(data);
     });
 
-    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentEncryptedMessageDto) => {
-      void this.handleMessageFromDMRServerEvent(data);
+    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentEncryptedMessageDto, ackCb) => {
+      void this.handleMessageFromDMRServerEvent(data, ackCb);
     });
   }
 

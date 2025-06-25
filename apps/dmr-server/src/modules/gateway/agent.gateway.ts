@@ -3,6 +3,7 @@ import {
   AgentEventNames,
   AgentMessageDto,
   DmrServerEvent,
+  ISocketActPayload,
   ValidationErrorDto,
 } from '@dmr/shared';
 import { BadRequestException, Logger } from '@nestjs/common';
@@ -85,7 +86,10 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @OnEvent(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT)
-  onRabbitMQMessage(payload: { agentId: string; message: AgentEncryptedMessageDto }): void {
+  async onRabbitMQMessage(payload: {
+    agentId: string;
+    message: AgentEncryptedMessageDto;
+  }): Promise<void> {
     try {
       const { agentId, message } = payload;
       const socket = this.findSocketByAgentId(agentId);
@@ -93,7 +97,14 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.logger.warn(`No connected socket found for agent ${agentId}`);
         return;
       }
-      socket.emit(AgentEventNames.MESSAGE_FROM_DMR_SERVER, message);
+
+      const response = (await socket.emitWithAck(
+        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+        message,
+      )) as ISocketActPayload;
+
+      console.log(response);
+
       this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
