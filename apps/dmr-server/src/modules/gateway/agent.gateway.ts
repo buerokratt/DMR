@@ -1,12 +1,11 @@
 import {
-  AgentEncryptedMessageDto,
   AgentEventNames,
   AgentMessageDto,
   DmrServerEvent,
   SimpleValidationFailureMessage,
   ValidationErrorDto,
 } from '@dmr/shared';
-import { BadRequestException, forwardRef, Logger } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
