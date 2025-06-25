@@ -4,10 +4,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as classTransformer from 'class-transformer';
 import * as classValidator from 'class-validator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { agentConfig, AgentConfig } from '../../common/config';
+import { agentConfig, AgentConfig, dmrServerConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 import { AgentsService } from './agents.service';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, GatewayTimeoutException } from '@nestjs/common';
 
 describe('AgentsService', () => {
   let service: AgentsService;
@@ -41,6 +41,13 @@ describe('AgentsService', () => {
   };
 
   beforeEach(async () => {
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+      'mock-uuid' as unknown as ReturnType<typeof crypto.randomUUID>,
+    );
+
+    vi.spyOn(classTransformer, 'plainToInstance').mockImplementation((_, obj) => obj as any);
+    vi.spyOn(classValidator, 'validate').mockResolvedValue([]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AgentsService,
@@ -52,12 +59,26 @@ describe('AgentsService', () => {
           },
         },
         {
+          provide: dmrServerConfig.KEY,
+          useValue: {
+            ackTimeoutMs: 10, // small timeout for fast failure in tests
+          },
+        },
+        {
           provide: CACHE_MANAGER,
           useValue: { set: vi.fn(), get: vi.fn() },
         },
         {
           provide: WebsocketService,
-          useValue: { isConnected: vi.fn(), getSocket: vi.fn() },
+          useValue: {
+            isConnected: vi.fn().mockReturnValue(true),
+            getSocket: vi.fn().mockReturnValue({
+              emit: vi.fn((_event, _payload, callback) => {
+                callback({ status: 'OK' });
+              }),
+              on: vi.fn(),
+            }),
+          },
         },
       ],
     }).compile();
@@ -66,10 +87,6 @@ describe('AgentsService', () => {
     websocketService = module.get(WebsocketService);
     cacheManager = module.get(CACHE_MANAGER);
     agentConfigMock = module.get(agentConfig.KEY);
-
-    // Mock transform and validation globally
-    vi.spyOn(classTransformer, 'plainToInstance').mockImplementation((_, obj) => obj as any);
-    vi.spyOn(classValidator, 'validate').mockResolvedValue([]); // Assume always valid
   });
 
   it('should call setupSocketEventListeners on module init', () => {
@@ -156,7 +173,7 @@ describe('AgentsService', () => {
 
       expect(result).toEqual(
         expect.objectContaining({
-          id: expect.any(String),
+          id: 'mock-uuid',
           type: MessageType.ChatMessage,
           payload: encryptedPayload,
           recipientId: mockRecipient.id,
@@ -295,6 +312,29 @@ describe('AgentsService', () => {
         BadRequestException,
       );
       expect(loggerErrorSpy).toHaveBeenCalledWith('Message not encrypted');
+    });
+
+    it('should throw GatewayTimeoutException if ack not received in time', async () => {
+      const socketMock = {
+        emit: vi.fn((_event, _payload, _callback) => {
+          // no ack callback, to trigger timeout
+        }),
+      } as any;
+
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue({
+        id: 'msg-id',
+        type: MessageType.ChatMessage,
+        payload: 'encrypted-payload',
+        recipientId: 'recipient-id',
+        senderId: agentConfigMock.id,
+        timestamp: new Date().toISOString(),
+      });
+      vi.spyOn(websocketService, 'isConnected').mockReturnValue(true);
+      vi.spyOn(websocketService, 'getSocket').mockReturnValue(socketMock);
+
+      await expect(service.sendEncryptedMessageToServer(message)).rejects.toThrow(
+        GatewayTimeoutException,
+      );
     });
   });
 });

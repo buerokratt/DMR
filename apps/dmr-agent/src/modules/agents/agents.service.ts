@@ -7,15 +7,26 @@ import {
   IAgent,
   IAgentList,
   MessageType,
+  SocketAckResponse,
+  SocketActEnum,
   Utils,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { AgentConfig, agentConfig } from '../../common/config';
+import {
+  BadGatewayException,
+  BadRequestException,
+  GatewayTimeoutException,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
+import { AgentConfig, DMRServerConfig, agentConfig, dmrServerConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
+import { Socket } from 'socket.io-client';
 
 @Injectable()
 export class AgentsService implements OnModuleInit {
@@ -24,6 +35,7 @@ export class AgentsService implements OnModuleInit {
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
+    @Inject(dmrServerConfig.KEY) private readonly dmrServerConfig: DMRServerConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly websocketService: WebsocketService,
   ) {}
@@ -142,6 +154,33 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
+  private async emitWithAck<TPayload, TAck>(
+    socket: Socket,
+    event: AgentEventNames,
+    payload: TPayload,
+  ): Promise<TAck> {
+    return new Promise((resolve, reject) => {
+      let called = false;
+
+      const timer = setTimeout(() => {
+        if (called) return;
+
+        called = true;
+
+        reject(new GatewayTimeoutException('Timeout waiting for DMR Server'));
+      }, this.dmrServerConfig.ackTimeoutMs);
+
+      socket.emit(event, payload, (ack: TAck) => {
+        if (called) return;
+
+        called = true;
+        clearTimeout(timer);
+
+        resolve(ack);
+      });
+    });
+  }
+
   async getAgentById(id: string): Promise<IAgent | null> {
     try {
       const agents: IAgent[] = (await this.cacheManager.get<IAgent[]>(this.AGENTS_CACHE_KEY)) ?? [];
@@ -162,6 +201,47 @@ export class AgentsService implements OnModuleInit {
     }
 
     this.logger.log(`Message encrypted successfully`);
+
+    if (!this.websocketService.isConnected()) {
+      this.logger.error('WebSocket service is not connected to DMR server.');
+      throw new BadGatewayException('WebSocket service is not connected to DMR server.');
+    }
+
+    const socket = this.websocketService.getSocket();
+
+    if (!socket) {
+      this.logger.error(
+        'Failed to get socket instance even though connection was reported as active',
+      );
+      throw new BadGatewayException(
+        'Failed to get socket instance even though connection was reported as active.',
+      );
+    }
+
+    try {
+      const ack = await this.emitWithAck<AgentEncryptedMessageDto, SocketAckResponse>(
+        socket,
+        AgentEventNames.MESSAGE_TO_DMR_SERVER,
+        encryptedMessage,
+      );
+
+      if (ack.status === SocketActEnum.ERROR) {
+        this.logger.error(ack.error);
+        throw new BadRequestException(ack.error);
+      }
+
+      this.logger.log('DMR Server acknowledged message');
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Unexpected error sending message to DMR Server';
+
+      if (error instanceof GatewayTimeoutException || error instanceof BadGatewayException) {
+        throw error;
+      }
+
+      this.logger.error(message);
+      throw new BadGatewayException(message);
+    }
   }
 
   async encryptMessagePayloadFromExternalService(
