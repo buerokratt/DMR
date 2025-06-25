@@ -55,7 +55,7 @@ describe('AuthService', () => {
     const testToken = 'mocked.jwt.token';
     const mockClientId = 'mockKid123';
     const mockPublicKey = '-----BEGIN PUBLIC KEY-----mockKey-----END PUBLIC KEY-----';
-    const mockPayload: JwtPayload = { sub: mockClientId, iat: 123, exp: 123 }; // sub matches clientId
+    const mockPayload: JwtPayload = { sub: mockClientId, iat: 123, exp: 123, cat: 175 }; // sub matches clientId
 
     it('should successfully verify a token', async () => {
       vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
@@ -122,7 +122,7 @@ describe('AuthService', () => {
     });
 
     it('should throw BadRequestException if token sub and kid do not match', async () => {
-      const mismatchedPayload: JwtPayload = { sub: 'different-user', iat: 123, exp: 123 };
+      const mismatchedPayload: JwtPayload = { sub: 'different-user', iat: 123, exp: 123, cat: 175 };
       vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
       mockCentOpsService.getCentOpsConfigurationByClientId.mockResolvedValueOnce({
         authenticationCertificate: mockPublicKey,
