@@ -67,6 +67,71 @@ graph TD
 - Has RabbitMQ UI-based monitoring tools set up.
 - Supports RabbitMQ clustering for scalability.
 
+## Prometheus
+
+### DMR server
+
+List of metrics:
+
+* **`dmr_socket_connections_active`** | `gauge`
+  Current number of active Socket.IO connections
+
+* **`dmr_socket_connections_total`** | `counter`
+  Total number of established connections
+
+* **`dmr_socket_disconnections_total`** | `counter`
+  Total number of disconnections
+
+* **`dmr_socket_connection_duration_seconds`** | `histogram`
+  Duration of a socket connection session
+
+* **`dmr_socket_errors_total`** | `counter`
+  Total number of connection errors
+
+* **`dmr_socket_events_received_total`** | `counter`
+  Total events received from clients
+  *(labels: `event`, `namespace`)*
+
+* **`dmr_socket_events_sent_total`** | `counter`
+  Total events sent to clients
+  *(labels: `event`, `namespace`)*
+
+* **`dmr_message_processing_duration_seconds`** | `histogram`
+  Time to process/forward a single message
+
+  Suggested alert rules:
+
+ Too many disconnected clients suddenly (spike detection)
+- alert: DMRHighDisconnectionRate
+  expr: increase(dmr_socket_disconnections_total[5m]) > 100
+  for: 2m
+  labels:
+    severity: warning
+  annotations:
+    summary: "High rate of disconnections in DMR Server"
+
+ Low number of active connections (possible outage)
+- alert: DMRSocketsDown
+  expr: dmr_socket_connections_active< 1
+  for: 1m
+  labels:
+    severity: critical
+  annotations:
+    summary: "No active socket connections detected on DMR Server"
+
+ Slow message routing
+- alert: DMRMessageRoutingLatencyHigh
+  expr: histogram_quantile(0.95, rate(dmr_message_processing_duration_seconds[5m])) > 0.5
+  for: 2m
+  labels:
+    severity: warning
+  annotations:
+    summary: "95th percentile message routing time exceeds 500ms"
+
+### DMR agent
+
+---
+
 ## Available Scripts
 
 ### Development
