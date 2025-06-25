@@ -1,8 +1,12 @@
+import { AgentMessageDto, DmrServerEvent, IRabbitQueue } from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { HttpService } from '@nestjs/axios';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as rabbit from 'amqplib';
 import { ConsumeMessage } from 'amqplib';
+import { firstValueFrom } from 'rxjs';
 import { rabbitMQConfig, RabbitMQConfig } from '../../common/config';
 
 @Injectable()
@@ -16,8 +20,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(rabbitMQConfig.KEY)
     private readonly rabbitMQConfig: RabbitMQConfig,
-    private readonly schedulerRegistry: SchedulerRegistry,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly httpService: HttpService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -95,6 +101,12 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     try {
       const dlqName = this.getDLQName(queueName);
 
+      const alreadyExist = await this.checkQueue(queueName);
+
+      if (alreadyExist) {
+        return true;
+      }
+
       // Create DLQ for our queue
       await channel.assertQueue(dlqName, {
         durable: true,
@@ -129,6 +141,32 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async setupQueueWithoutDLQ(queueName: string, ttl?: number): Promise<boolean> {
+    const channel = this.channel;
+
+    try {
+      await channel.assertQueue(queueName, {
+        durable: true,
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': ttl ?? this.rabbitMQConfig.ttl,
+        },
+      });
+
+      this.logger.log(
+        `Queue ${queueName} with TTL ${ttl ?? this.rabbitMQConfig.ttl}ms set up (no DLQ).`,
+      );
+
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`Error while setting up queue ${queueName}: ${error.message}`);
+      }
+
+      return false;
+    }
+  }
+
   async deleteQueue(queueName: string): Promise<boolean> {
     const channel = this.channel;
 
@@ -155,11 +193,22 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
-    const channel = this.channel;
-
     try {
-      await channel.checkQueue(queueName);
+      const base64 = Buffer.from(
+        `${this.rabbitMQConfig.username}:${this.rabbitMQConfig.password}`,
+      ).toString('base64');
+      const authorization = `Basic ${base64}`;
 
+      const encodedVhost = encodeURIComponent('/');
+      const getQueueURL = `${this.rabbitMQConfig.managementUIUri}/api/queues/${encodedVhost}/${queueName}`;
+
+      const { data: queue } = await firstValueFrom(
+        this.httpService.get<IRabbitQueue>(getQueueURL, {
+          headers: { Authorization: authorization },
+        }),
+      );
+
+      this.logger.log(`Queues in vhost "/":`, queue.name);
       return true;
     } catch {
       return false;
@@ -182,11 +231,17 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         queueName,
         (message: ConsumeMessage | null): void => {
           try {
-            const messageContent = message ? message.content.toString() : null;
-
-            this.logger.debug(`Processing message from queue ${queueName}:`, messageContent);
+            if (message) {
+              this.forwardMessageToAgent(queueName, message);
+              channel.ack(message);
+            } else {
+              this.logger.warn('Message is null');
+            }
           } catch (error) {
             this.logger.error(`Error processing message from queue ${queueName}:`, error);
+            if (message) {
+              channel.nack(message, false, false);
+            }
           }
         },
         { noAck: false },
@@ -201,6 +256,22 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`Error subscribing to queue ${queueName}: ${error.message}`);
       }
       return false;
+    }
+  }
+
+  private forwardMessageToAgent(agentId: string, message: ConsumeMessage): void {
+    try {
+      const messageContent = message.content.toString();
+      const parsedMessage = JSON.parse(messageContent) as AgentMessageDto;
+      this.eventEmitter.emit(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT, {
+        agentId,
+        message: parsedMessage,
+      });
+      this.logger.log(`Message forwarded to agent ${agentId}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logger.error(`Error forwarding message to agent ${agentId}: ${error.message}`);
+      }
     }
   }
 
