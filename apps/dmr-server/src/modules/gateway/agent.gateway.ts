@@ -1,10 +1,4 @@
-import {
-  AgentEncryptedMessageDto,
-  AgentEventNames,
-  AgentMessageDto,
-  DmrServerEvent,
-  ValidationErrorDto,
-} from '@dmr/shared';
+import { AgentEventNames, AgentMessageDto, DmrServerEvent, ValidationErrorDto } from '@dmr/shared';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
@@ -85,7 +79,7 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @OnEvent(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT)
-  onRabbitMQMessage(payload: { agentId: string; message: AgentEncryptedMessageDto }): void {
+  onRabbitMQMessage(payload: { agentId: string; message: AgentMessageDto }): void {
     try {
       const { agentId, message } = payload;
       const socket = this.findSocketByAgentId(agentId);
