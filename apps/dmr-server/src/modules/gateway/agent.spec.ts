@@ -159,7 +159,7 @@ describe('AgentGateway', () => {
   });
 
   describe('handleConnection', () => {
-    const mockPayload = { sub: 'testAgentId', iat: 123, exp: 123 };
+    const mockPayload = { sub: 'testAgentId', iat: 123, exp: 123, cat: 175 };
 
     it('should allow connection and emit full agent list when consume is truthy', async () => {
       const token = 'valid.jwt.token';
@@ -213,6 +213,8 @@ describe('AgentGateway', () => {
 
     it('should disconnect client and log error if no token', async () => {
       const client = createMockSocket(undefined);
+
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
 
       await gateway.handleConnection(client);
 

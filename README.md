@@ -59,6 +59,7 @@ graph TD
 - **Cannot** read the message contents, these are encrypted by the DMR agents.
 - There can be several instances of DMR server running, depending on load.
 - In the future, can potentially be extended to perform operations — like applying policies — on incoming and outgoing messages.
+- Includes support for Prometheus-based monitoring to help track the real-time health and behavior of the DMR server, specifically around WebSocket activity and message processing.
 
 ### RabbitMQ
 
@@ -66,6 +67,7 @@ graph TD
 - Has a dead letter queue for messages that failed to deliver.
 - Has RabbitMQ UI-based monitoring tools set up.
 - Supports RabbitMQ clustering for scalability.
+- https://www.rabbitmq.com/kubernetes/operator/operator-monitoring
 
 ## Available Scripts
 

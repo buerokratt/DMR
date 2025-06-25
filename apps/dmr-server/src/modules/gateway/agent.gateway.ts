@@ -115,7 +115,7 @@ export class AgentGateway
       this.metricService.activeConnectionGauge.inc(1);
       this.metricService.connectionsTotalCounter.inc(1);
 
-      Object.assign(client, { agent: Object.assign(jwtPayload, { cat: Date.now() }) });
+      Object.assign(client, { agent: jwtPayload });
     } catch {
       this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
       client.disconnect();
