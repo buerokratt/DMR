@@ -15,7 +15,6 @@ import {
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import * as crypto from 'node:crypto';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -158,10 +157,10 @@ export class AgentsService implements OnModuleInit {
 
     if (errors.length !== 0) {
       const error: SimpleValidationFailureMessage = {
-        id: crypto.randomUUID(),
+        id: message.id,
         errors: errors,
-        message: `Error while decrypting message ${message.id}`,
-        receivedAt: new Date().toISOString(),
+        message: message,
+        receivedAt: message.receivedAt || new Date().toISOString(),
       };
 
       this.websocketService.getSocket()?.emit(AgentEventNames.MESSAGE_PROCESSING_FAILED, error);
