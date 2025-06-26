@@ -5,7 +5,7 @@ export const handlers = [
     return HttpResponse.json({
       response: [
         {
-          id: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
+          id: process.env.MOCK_DMR_AGENT_A_ID,
           name: 'Police',
           authentication_certificate:
             process.env.MOCK_DMR_AGENT_A_PUBLIC_KEY || 'MOCK_DMR_AGENT_A_PUBLIC_KEY not set',
@@ -13,7 +13,7 @@ export const handlers = [
           updated_at: '2025-06-10T12:34:56Z',
         },
         {
-          id: 'a1e45678-12bc-4ef0-9876-def123456789',
+          id: process.env.MOCK_DMR_AGENT_B_ID,
           name: 'Tax office',
           authentication_certificate:
             process.env.MOCK_DMR_AGENT_B_PUBLIC_KEY || 'MOCK_DMR_AGENT_B_PUBLIC_KEY not set',

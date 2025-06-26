@@ -1,8 +1,11 @@
+import { DmrServerEvent } from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConsumeMessage } from 'amqplib';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { rabbitMQConfig } from '../../common/config';
 import { RabbitMQService } from './rabbitmq.service';
 
@@ -13,6 +16,8 @@ vi.mock('amqplib', async () => {
   const onMock = vi.fn();
   const consumeMock = vi.fn();
   const cancelMock = vi.fn();
+  const ackMock = vi.fn(); // Mock for channel.ack
+  const nackMock = vi.fn(); // Mock for channel.nack
 
   const createChannelMock = vi.fn().mockResolvedValue({
     on: onMock,
@@ -21,6 +26,8 @@ vi.mock('amqplib', async () => {
     deleteQueue: deleteQueueMock,
     consume: consumeMock,
     cancel: cancelMock,
+    ack: ackMock, // Add ack to mocked channel
+    nack: nackMock, // Add nack to mocked channel
   });
 
   const closeConnectionMock = vi.fn();
@@ -46,11 +53,16 @@ vi.mock('amqplib', async () => {
       cancelMock,
       closeConnectionMock,
       removeAllListenersConnectionMock,
+      ackMock, // Export ackMock
+      nackMock, // Export nackMock
     },
   };
 });
 
+import { HttpService } from '@nestjs/axios';
 import * as amqplib from 'amqplib';
+import { of, throwError } from 'rxjs';
+import { AgentGateway } from '../../modules/gateway'; // Import AgentGateway
 const {
   assertQueueMock,
   deleteQueueMock,
@@ -59,12 +71,17 @@ const {
   cancelMock,
   closeConnectionMock,
   removeAllListenersConnectionMock,
+  ackMock, // Destructure ackMock
+  nackMock, // Destructure nackMock
 } = (amqplib as any).__mocks;
 
 describe('RabbitMQService', () => {
+  let httpService: HttpService;
   let service: RabbitMQService;
   let schedulerRegistry: SchedulerRegistry;
   let cacheManager: Cache;
+  let eventEmitter: EventEmitter2;
+  let agentGateway: AgentGateway; // Declare agentGateway
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -82,6 +99,7 @@ describe('RabbitMQService', () => {
             ttl: 60000,
             dlqTTL: 60000,
             reconnectInterval: 5000,
+            managementUIUri: 'http://localhost:15672',
           },
         },
         {
@@ -96,12 +114,31 @@ describe('RabbitMQService', () => {
             del: vi.fn(),
           },
         },
+        {
+          provide: EventEmitter2,
+          useValue: {
+            emit: vi.fn(),
+          },
+        },
+        {
+          provide: HttpService,
+          useValue: { get: vi.fn() },
+        },
+        {
+          provide: AgentGateway, // Provide mock for AgentGateway
+          useValue: {
+            forwardMessageToAgent: vi.fn(),
+          },
+        },
       ],
     }).compile();
 
+    cacheManager = module.get(CACHE_MANAGER);
+    httpService = module.get<HttpService>(HttpService);
     service = module.get<RabbitMQService>(RabbitMQService);
     schedulerRegistry = module.get<SchedulerRegistry>(SchedulerRegistry);
-    cacheManager = module.get(CACHE_MANAGER);
+    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+    agentGateway = module.get<AgentGateway>(AgentGateway); // Get AgentGateway instance
 
     await service.onModuleInit();
   });
@@ -145,22 +182,36 @@ describe('RabbitMQService', () => {
   });
 
   it('should return true if queue exists', async () => {
-    checkQueueMock.mockResolvedValueOnce(true);
+    const mockData = {
+      arguments: {},
+      auto_delete: false,
+      durable: true,
+      exclusive: false,
+      leader: 'rabbit',
+      members: ['rabbit'],
+      name: 'test-queue',
+      node: 'rabbit',
+      online: ['rabbit'],
+      state: 'running',
+      type: 'quorum',
+      vhost: '/',
+    };
+
+    vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
     const result = await service.checkQueue('test-queue');
 
     expect(result).toBe(true);
-    expect(checkQueueMock).toHaveBeenCalledWith('test-queue');
   });
 
   it('should return false if queue does not exist', async () => {
-    checkQueueMock.mockRejectedValueOnce(new Error('Not Found'));
+    vi.spyOn(httpService, 'get').mockReturnValue(throwError(() => new Error('Not found')));
     const result = await service.checkQueue('test-queue');
 
     expect(result).toBe(false);
-    expect(checkQueueMock).toHaveBeenCalledWith('test-queue');
   });
 
   it('should setup queue and DLQ', async () => {
+    vi.spyOn(httpService, 'get').mockReturnValue(throwError(() => new Error('Not found')));
     const result = await service.setupQueue('test-queue', 1000);
 
     expect(result).toBe(true);
@@ -189,6 +240,47 @@ describe('RabbitMQService', () => {
     expect(result).toBe(true);
     expect(deleteQueueMock).toHaveBeenCalledWith('test-queue.dlq');
     expect(deleteQueueMock).toHaveBeenCalledWith('test-queue');
+  });
+
+  describe('setupQueueWithoutDLQ', () => {
+    it('should setup queue without DLQ with default TTL', async () => {
+      const queueName = 'test-queue-no-dlq';
+      const result = await service.setupQueueWithoutDLQ(queueName);
+
+      expect(result).toBe(true);
+      expect(assertQueueMock).toHaveBeenCalledWith(queueName, {
+        durable: true,
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': 60000, // default TTL from config
+        },
+      });
+    });
+
+    it('should setup queue without DLQ with custom TTL', async () => {
+      const queueName = 'test-queue-no-dlq-custom';
+      const customTTL = 120000; // 2 minutes
+      const result = await service.setupQueueWithoutDLQ(queueName, customTTL);
+
+      expect(result).toBe(true);
+      expect(assertQueueMock).toHaveBeenCalledWith(queueName, {
+        durable: true,
+        arguments: {
+          'x-queue-type': 'quorum',
+          'x-message-ttl': customTTL,
+        },
+      });
+    });
+
+    it('should return false when queue setup fails', async () => {
+      const queueName = 'test-queue-error';
+      const error = new Error('Queue setup failed');
+      assertQueueMock.mockRejectedValueOnce(error);
+
+      const result = await service.setupQueueWithoutDLQ(queueName);
+
+      expect(result).toBe(false);
+    });
   });
 
   it('should subscribe to a queue and store consumer tag', async () => {
@@ -248,5 +340,111 @@ describe('RabbitMQService', () => {
 
     expect(removeAllListenersConnectionMock).toHaveBeenCalled();
     expect(closeConnectionMock).toHaveBeenCalled();
+  });
+
+  describe('Message Forwarding', () => {
+    describe('forwardMessageToAgent', () => {
+      it('should parse message content and forward message to AgentGateway', () => {
+        const agentId = 'test-agent-id';
+        const mockMessage = {
+          content: Buffer.from(
+            JSON.stringify({
+              id: 'test-message-id',
+              senderId: 'test-sender-id',
+              recipientId: agentId,
+              timestamp: '2025-06-18T14:00:00Z',
+              payload: '{"key":"value"}',
+            }),
+          ),
+        } as ConsumeMessage;
+
+        (service as any).forwardMessageToAgent(agentId, mockMessage);
+
+        expect(agentGateway.forwardMessageToAgent).toHaveBeenCalledWith(
+          agentId,
+          expect.objectContaining({
+            id: 'test-message-id',
+            senderId: 'test-sender-id',
+            recipientId: agentId,
+            timestamp: '2025-06-18T14:00:00Z',
+            payload: '{"key":"value"}',
+          }),
+        );
+      });
+
+      it('should handle JSON parsing errors', () => {
+        const agentId = 'test-agent-id';
+        const mockMessage = {
+          content: Buffer.from('invalid-json'),
+        } as ConsumeMessage;
+
+        const loggerSpy = vi.spyOn(Logger.prototype, 'error');
+
+        (service as any).forwardMessageToAgent(agentId, mockMessage);
+
+        expect(loggerSpy).toHaveBeenCalledWith(
+          expect.stringContaining(`Error forwarding message to agent ${agentId}`),
+        );
+      });
+    });
+
+    describe('subscribe method with message processing', () => {
+      it('should process messages and acknowledge them', async () => {
+        const queueName = 'test-queue';
+        const mockMessage = {
+          content: Buffer.from(
+            JSON.stringify({
+              id: 'test-message-id',
+              senderId: 'test-sender-id',
+            }),
+          ),
+        } as ConsumeMessage;
+
+        let capturedCallback: (msg: ConsumeMessage) => void;
+        consumeMock.mockImplementation((queue: any, callback: (msg: ConsumeMessage) => void) => {
+          capturedCallback = callback;
+          return Promise.resolve({ consumerTag: 'test-tag' });
+        });
+
+        vi.spyOn(service, 'checkQueue').mockResolvedValue(true);
+
+        const forwardSpy = vi.spyOn(service as any, 'forwardMessageToAgent');
+
+        await service.subscribe(queueName);
+
+        expect(consumeMock).toHaveBeenCalledWith(queueName, expect.any(Function), { noAck: false });
+
+        capturedCallback!(mockMessage);
+
+        expect(forwardSpy).toHaveBeenCalledWith(queueName, mockMessage);
+        expect(ackMock).toHaveBeenCalledWith(mockMessage);
+      });
+
+      it('should handle errors and nack messages when processing fails', async () => {
+        const queueName = 'test-queue';
+        const mockMessage = {
+          content: Buffer.from('invalid-json'),
+        } as ConsumeMessage;
+
+        let capturedCallback: (msg: ConsumeMessage) => void;
+        consumeMock.mockImplementation((queue: any, callback: (msg: ConsumeMessage) => void) => {
+          capturedCallback = callback;
+          return Promise.resolve({ consumerTag: 'test-tag' });
+        });
+
+        vi.spyOn(service, 'checkQueue').mockResolvedValue(true);
+
+        vi.spyOn(service as any, 'forwardMessageToAgent').mockImplementation(() => {
+          throw new Error('Test error');
+        });
+
+        await service.subscribe(queueName);
+
+        capturedCallback!(mockMessage);
+
+        expect(ackMock).not.toHaveBeenCalled();
+        expect(nackMock).toHaveBeenCalledWith(mockMessage, false, false);
+      });
+    });
   });
 });

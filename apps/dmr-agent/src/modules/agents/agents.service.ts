@@ -3,11 +3,15 @@ import {
   AgentDto,
   AgentEncryptedMessageDto,
   AgentEventNames,
+  AgentMessageDto,
+  ValidationErrorType,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
   MessageType,
   Utils,
+  SimpleValidationFailureMessage,
+  ValidationErrorDto,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -57,7 +61,7 @@ export class AgentsService implements OnModuleInit {
       void this.handlePartialAgentListEvent(data);
     });
 
-    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentEncryptedMessageDto) => {
+    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentMessageDto) => {
       void this.handleMessageFromDMRServerEvent(data);
     });
   }
@@ -126,19 +130,44 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
-  private async handleMessageFromDMRServerEvent(message: AgentEncryptedMessageDto): Promise<void> {
+  private async handleMessageFromDMRServerEvent(message: AgentMessageDto): Promise<void> {
+    const errors: ValidationErrorDto[] = [];
+
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
       if (!decryptedMessage) {
         this.logger.error(`Something went wrong while decrypting the message`);
-        return;
+        errors.push({
+          type: ValidationErrorType.DECRYPTION_FAILED,
+          message: 'Something went wrong while decrypting the message.',
+        });
+      } else {
+        this.logger.log('Message is decrypted');
       }
-
-      this.logger.log('Message is decrypted');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
+
+      errors.push({
+        type: ValidationErrorType.SIGNATURE_VALIDATION_FAILED,
+        message: errorMessage,
+      });
+    }
+
+    if (errors.length !== 0) {
+      const error: SimpleValidationFailureMessage = {
+        id: message.id,
+        errors: errors,
+        message: message,
+        receivedAt: message.receivedAt || new Date().toISOString(),
+      };
+
+      this.websocketService.getSocket()?.emit(AgentEventNames.MESSAGE_PROCESSING_FAILED, error);
+
+      this.logger.warn(
+        `Emitted ${AgentEventNames.MESSAGE_PROCESSING_FAILED} event for message ${message.id} with errors: ${JSON.stringify(errors)}`,
+      );
     }
   }
 
@@ -228,8 +257,9 @@ export class AgentsService implements OnModuleInit {
       return decryptedMessage;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+
       this.logger.error(`Error decrypting message: ${errorMessage}`);
-      return null;
+      throw new BadRequestException(errorMessage);
     }
   }
 }

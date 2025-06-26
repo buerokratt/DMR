@@ -1,4 +1,11 @@
-import { IAgent, IAgentList, MessageType, Utils } from '@dmr/shared';
+import {
+  AgentEventNames,
+  IAgent,
+  IAgentList,
+  MessageType,
+  Utils,
+  ValidationErrorType,
+} from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as classTransformer from 'class-transformer';
@@ -57,7 +64,10 @@ describe('AgentsService', () => {
         },
         {
           provide: WebsocketService,
-          useValue: { isConnected: vi.fn(), getSocket: vi.fn() },
+          useValue: {
+            isConnected: vi.fn().mockReturnValue(true),
+            getSocket: vi.fn(),
+          },
         },
       ],
     }).compile();
@@ -67,9 +77,8 @@ describe('AgentsService', () => {
     cacheManager = module.get(CACHE_MANAGER);
     agentConfigMock = module.get(agentConfig.KEY);
 
-    // Mock transform and validation globally
     vi.spyOn(classTransformer, 'plainToInstance').mockImplementation((_, obj) => obj as any);
-    vi.spyOn(classValidator, 'validate').mockResolvedValue([]); // Assume always valid
+    vi.spyOn(classValidator, 'validate').mockResolvedValue([]);
   });
 
   it('should call setupSocketEventListeners on module init', () => {
@@ -250,16 +259,57 @@ describe('AgentsService', () => {
       vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockSender);
       vi.spyOn(Utils, 'decryptPayload').mockRejectedValueOnce(new Error('Decrypt fail'));
 
-      const result = await service.decryptMessagePayloadFromDMRServer({
-        id: 'id',
+      try {
+        await service.decryptMessagePayloadFromDMRServer({
+          id: 'id',
+          type: MessageType.ChatMessage,
+          payload: encryptedPayload,
+          senderId: mockSender.id,
+          recipientId: agentConfigMock.id,
+          timestamp: '',
+        });
+      } catch (error) {
+        expect(error instanceof Error ? error.message : '').toContain('Decrypt fail');
+      }
+    });
+  });
+
+  describe('handleMessageFromDMRServerEvent', () => {
+    it('should emit MESSAGE_PROCESSING_FAILED if decryption fails', async () => {
+      const mockSender = {
+        id: 'sender-id',
+        authenticationCertificate: 'mock-cert',
+      };
+
+      const message = {
+        id: 'msg-1',
         type: MessageType.ChatMessage,
-        payload: encryptedPayload,
+        payload: 'encrypted-payload',
         senderId: mockSender.id,
         recipientId: agentConfigMock.id,
-        timestamp: '',
-      });
+        timestamp: new Date().toISOString(),
+      };
 
-      expect(result).toBeNull();
+      const emitSpy = vi.fn();
+
+      vi.spyOn(websocketService, 'getSocket').mockReturnValue({
+        emit: emitSpy,
+      } as any);
+
+      vi.spyOn(service as any, 'decryptMessagePayloadFromDMRServer').mockResolvedValueOnce(null);
+
+      await (service as any).handleMessageFromDMRServerEvent(message);
+
+      expect(emitSpy).toHaveBeenCalledWith(
+        AgentEventNames.MESSAGE_PROCESSING_FAILED,
+        expect.objectContaining({
+          errors: expect.arrayContaining([
+            expect.objectContaining({
+              type: ValidationErrorType.DECRYPTION_FAILED,
+            }),
+          ]),
+        }),
+      );
     });
   });
 
