@@ -1,14 +1,20 @@
-import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
-import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Server, Socket } from 'socket.io';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
-import { AuthService } from '../auth/auth.service';
 import { CentOpsService } from '../centops/centops.service';
-import { AgentGateway } from './agent.gateway';
 import { MessageValidatorService } from './message-validator.service';
+import { Logger } from '@nestjs/common';
+import { Server, Socket } from 'socket.io';
+import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
+import { AgentGateway } from './agent.gateway';
+import {
+  AgentEventNames,
+  JwtPayload,
+  SimpleValidationFailureMessage,
+  ValidationErrorType,
+  MessageType,
+} from '@dmr/shared';
+import { AuthService } from '../auth/auth.service';
 
 declare module 'socket.io' {
   interface Socket {
@@ -81,8 +87,8 @@ describe('AgentGateway', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: RabbitMQService, useValue: mockRabbitMQService },
         { provide: MessageValidatorService, useValue: mockMessageValidatorService },
-        { provide: CentOpsService, useValue: mockCentOpsService },
         { provide: RabbitMQMessageService, useValue: mockRabbitMQMessageService },
+        { provide: CentOpsService, useValue: mockCentOpsService },
       ],
     }).compile();
 
@@ -425,7 +431,7 @@ describe('AgentGateway', () => {
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
 
-      // Add sockets to the server's sockets collection using our helper method
+      // Add sockets to the server's sockets collection
       (serverMock as any).setMockSockets([
         ['socket-1', mockSocket1],
         ['socket-2', mockSocket2],
