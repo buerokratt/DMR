@@ -3,8 +3,8 @@ import { BadRequestException, Logger, UnauthorizedException } from '@nestjs/comm
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CentOpsService } from '../centops/centops.service';
 import { AuthService } from './auth.service';
+import { CentOpsService } from '../centops/centops.service';
 
 const mockCentOpsService = {
   getCentOpsConfigurationByClientId: vi.fn(),
