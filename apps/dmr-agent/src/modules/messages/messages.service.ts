@@ -31,7 +31,6 @@ import {
 } from '@nestjs/common';
 import { AgentConfig, DMRServerConfig, agentConfig, dmrServerConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
-import { Socket } from 'socket.io-client';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()
@@ -208,33 +207,6 @@ export class MessagesService implements OnModuleInit {
     }
   }
 
-  private async emitWithAck<TPayload, TAck>(
-    socket: Socket,
-    event: AgentEventNames,
-    payload: TPayload,
-  ): Promise<TAck> {
-    return new Promise((resolve, reject) => {
-      let called = false;
-
-      const timer = setTimeout(() => {
-        if (called) return;
-
-        called = true;
-
-        reject(new GatewayTimeoutException('Timeout waiting for DMR Server'));
-      }, this.dmrServerConfig.ackTimeoutMs);
-
-      socket.emit(event, payload, (ack: TAck) => {
-        if (called) return;
-
-        called = true;
-        clearTimeout(timer);
-
-        resolve(ack);
-      });
-    });
-  }
-
   async getAgentById(id: string): Promise<IAgent | null> {
     try {
       const agents: IAgent[] = (await this.cacheManager.get<IAgent[]>(this.AGENTS_CACHE_KEY)) ?? [];
@@ -273,11 +245,9 @@ export class MessagesService implements OnModuleInit {
     }
 
     try {
-      const ack = await this.emitWithAck<AgentEncryptedMessageDto, SocketAckResponse>(
-        socket,
-        AgentEventNames.MESSAGE_TO_DMR_SERVER,
-        encryptedMessage,
-      );
+      const ack = (await socket
+        .timeout(this.dmrServerConfig.ackTimeoutMs)
+        .emitWithAck(AgentEventNames.MESSAGE_TO_DMR_SERVER, encryptedMessage)) as SocketAckResponse;
 
       if (ack.status === SocketActEnum.ERROR) {
         this.logger.error(ack.error);
