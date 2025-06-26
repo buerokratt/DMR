@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { CommonModule } from './common/common.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { HealthModule } from './modules/health/health.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
 
 @Module({
-  imports: [CommonModule, HealthModule, WebsocketModule, MessagesModule],
+  imports: [CommonModule, HealthModule, WebsocketModule, MessagesModule, HttpModule],
 })
 export class AppModule {}

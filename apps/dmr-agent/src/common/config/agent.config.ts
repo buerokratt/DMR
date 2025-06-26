@@ -8,10 +8,12 @@ const variables = Utils.validateObject(
   {
     id: String(process.env.AGENT_ID),
     privateKey: String(process.env.AGENT_PRIVATE_KEY),
+    outgoingMessageEndpoint: String(process.env.OUTGOING_MESSAGE_ENDPOINT || ''),
   },
   {
     id: Joi.string().uuid().required(),
     privateKey: Joi.string().required(),
+    outgoingMessageEndpoint: Joi.string().allow(''),
   },
 );
 
