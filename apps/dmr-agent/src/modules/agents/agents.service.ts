@@ -7,6 +7,7 @@ import {
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
+  ISocketActCallback,
   MessageType,
   SimpleValidationFailureMessage,
   Utils,
@@ -17,7 +18,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 
@@ -61,9 +62,12 @@ export class AgentsService implements OnModuleInit {
       void this.handlePartialAgentListEvent(data);
     });
 
-    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentEncryptedMessageDto, ackCb) => {
-      void this.handleMessageFromDMRServerEvent(data, ackCb);
-    });
+    socket.on(
+      AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+      (data: AgentEncryptedMessageDto, cb: ISocketActCallback) => {
+        void this.handleMessageFromDMRServerEvent(data, cb);
+      },
+    );
   }
 
   private async handleFullAgentListEvent(data: IAgentList): Promise<void> {
@@ -130,7 +134,10 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
-  private async handleMessageFromDMRServerEvent(message: AgentMessageDto): Promise<void> {
+  private async handleMessageFromDMRServerEvent(
+    message: AgentMessageDto,
+    cb: ISocketActCallback,
+  ): Promise<void> {
     const errors: ValidationErrorDto[] = [];
 
     try {
@@ -248,7 +255,7 @@ export class AgentsService implements OnModuleInit {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
 
       this.logger.error(`Error decrypting message: ${errorMessage}`);
-      throw new BadRequestException(errorMessage);
+      return null;
     }
   }
 }
