@@ -153,7 +153,7 @@ export class AgentsService implements OnModuleInit {
 
       this.logger.log('Message is decrypted');
 
-      ackCb({ status: SocketAckStatusEnum.OK });
+      return ackCb({ status: SocketAckStatusEnum.OK });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
@@ -162,10 +162,10 @@ export class AgentsService implements OnModuleInit {
         type: ValidationErrorType.SIGNATURE_VALIDATION_FAILED,
         message: errorMessage,
       });
-    } finally {
-      if (errors.length !== 0) {
-        ackCb({ status: SocketAckStatusEnum.ERROR, errors });
-      }
+    }
+
+    if (errors.length !== 0) {
+      return ackCb({ status: SocketAckStatusEnum.ERROR, errors });
     }
   }
 
