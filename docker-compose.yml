@@ -39,6 +39,8 @@ services:
     environment:
       - PORT=5000
       - ENVIRONMENT=development
+      - LOGGER_COLORS=true
+      - LOGGER_LOG_LEVELS=error,warn,log
       - WEB_SOCKET_MAX_DISCONNECTION_DURATION=120000
       - CENTOPS_CONFIGURATION_URL=http://localhost:3000/centops/clients
       - CENTOPS_CONFIGURATION_CRON_TIME=*/10 * * * * *
@@ -70,6 +72,8 @@ services:
     environment:
       - PORT=5001
       - ENVIRONMENT=development
+      - LOGGER_COLORS=true
+      - LOGGER_LOG_LEVELS=error,warn,log
       - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:5000/v1/dmr-agent-events
       - WEBSOCKET_RECONNECTION_DELAY=1000
       - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
@@ -91,6 +95,8 @@ services:
     environment:
       - PORT=5001
       - ENVIRONMENT=development
+      - LOGGER_COLORS=true
+      - LOGGER_LOG_LEVELS=error,warn,log
       - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:5000/v1/dmr-agent-events
       - WEBSOCKET_RECONNECTION_DELAY=1000
       - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
