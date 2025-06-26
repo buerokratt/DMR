@@ -246,6 +246,8 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
             const result = await this.forwardMessageToAgent(queueName, message);
 
+            console.log(result);
+
             if (!result || result.status === SocketAckStatus.ERROR) {
               return channel.nack(message, false, false);
             }
