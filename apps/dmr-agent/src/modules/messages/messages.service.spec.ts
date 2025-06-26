@@ -1,8 +1,10 @@
 import {
   AgentEventNames,
+  ExternalServiceMessageDto,
   IAgent,
   IAgentList,
   MessageType,
+  SocketActEnum,
   Utils,
   ValidationErrorType,
 } from '@dmr/shared';
@@ -16,7 +18,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentConfig, AgentConfig, dmrServerConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 import { MessagesService } from './messages.service';
-import { BadRequestException, GatewayTimeoutException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, GatewayTimeoutException } from '@nestjs/common';
 
 describe('AgentsService', () => {
   let service: MessagesService;
@@ -330,59 +332,257 @@ describe('AgentsService', () => {
   });
 
   describe('sendEncryptedMessageToServer', () => {
-    const message = {
-      id: 'msg-id',
+    const mockMessage = {
+      id: 'test-message-id',
       recipientId: 'recipient-id',
-      payload: ['test-payload'],
+      payload: ['some-data'],
     };
 
-    it('should log success if message is encrypted and sent', async () => {
-      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue({
-        id: 'msg-id',
-        type: MessageType.ChatMessage,
-        payload: 'encrypted-payload',
-        recipientId: 'recipient-id',
-        senderId: agentConfigMock.id,
-        timestamp: new Date().toISOString(),
-      });
+    const mockEncryptedMessage = {
+      id: 'encrypted-message-id',
+      type: MessageType.ChatMessage,
+      payload: 'encrypted-payload',
+      recipientId: 'recipient-id',
+      senderId: 'test-agent',
+      timestamp: '2025-06-26T10:00:00.000Z',
+    };
 
-      const loggerSpy = vi.spyOn(service['logger'], 'log');
+    let mockSocket: any;
 
-      await service.sendEncryptedMessageToServer(message);
+    beforeEach(() => {
+      vi.clearAllMocks();
 
-      expect(loggerSpy).toHaveBeenCalledWith('Message encrypted successfully');
+      mockSocket = {
+        timeout: vi.fn().mockReturnThis(),
+        emitWithAck: vi.fn(),
+      };
     });
 
-    it('should throw BadRequestException if encryption fails', async () => {
-      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(null);
-      const loggerErrorSpy = vi.spyOn(service['logger'], 'error');
-
-      await expect(service.sendEncryptedMessageToServer(message)).rejects.toThrow(
-        BadRequestException,
+    it('should successfully send encrypted message to DMR server', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
       );
-      expect(loggerErrorSpy).toHaveBeenCalledWith('Message not encrypted');
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      mockSocket.emitWithAck.mockResolvedValue({
+        status: SocketActEnum.OK,
+      });
+
+      await service.sendEncryptedMessageToServer(mockMessage);
+
+      expect(service.encryptMessagePayloadFromExternalService).toHaveBeenCalledWith(mockMessage);
+      expect(websocketService.isConnected).toHaveBeenCalled();
+      expect(websocketService.getSocket).toHaveBeenCalled();
+      expect(mockSocket.timeout).toHaveBeenCalledWith(10);
+      expect(mockSocket.emitWithAck).toHaveBeenCalledWith(
+        AgentEventNames.MESSAGE_TO_DMR_SERVER,
+        mockEncryptedMessage,
+      );
     });
 
-    it('should throw GatewayTimeoutException if ack not received in time', async () => {
-      const socketMock = {
-        emit: vi.fn((_event, _payload, _callback) => {
-          // no ack callback, to trigger timeout
-        }),
-      } as any;
+    it('should throw Error when message encryption fails', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(null);
 
-      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue({
-        id: 'msg-id',
-        type: MessageType.ChatMessage,
-        payload: 'encrypted-payload',
-        recipientId: 'recipient-id',
-        senderId: agentConfigMock.id,
-        timestamp: new Date().toISOString(),
-      });
-      vi.spyOn(websocketService, 'isConnected').mockReturnValue(true);
-      vi.spyOn(websocketService, 'getSocket').mockReturnValue(socketMock);
+      await expect(service.sendEncryptedMessageToServer(mockMessage)).rejects.toThrow(
+        'Message not encrypted',
+      );
 
-      await expect(service.sendEncryptedMessageToServer(message)).rejects.toThrow(
-        GatewayTimeoutException,
+      expect(websocketService.isConnected).not.toHaveBeenCalled();
+      expect(websocketService.getSocket).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadGatewayException when websocket is not connected', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(false);
+
+      await expect(service.sendEncryptedMessageToServer(mockMessage)).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      await expect(service.sendEncryptedMessageToServer(mockMessage)).rejects.toThrow(
+        'WebSocket service is not connected to DMR server.',
+      );
+
+      expect(websocketService.getSocket).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadGatewayException when socket instance is null', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(null);
+
+      await expect(service.sendEncryptedMessageToServer(mockMessage)).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      await expect(service.sendEncryptedMessageToServer(mockMessage)).rejects.toThrow(
+        'Failed to get socket instance even though connection was reported as active.',
+      );
+    });
+
+    it('should throw BadGatewayException when socket instance is undefined', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(undefined);
+
+      await expect(service.sendEncryptedMessageToServer(mockMessage)).rejects.toThrow(
+        BadGatewayException,
+      );
+    });
+
+    it('should handle timeout and throw BadGatewayException', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      mockSocket.emitWithAck.mockRejectedValue(new GatewayTimeoutException('Timeout'));
+
+      try {
+        await service.sendEncryptedMessageToServer(mockMessage);
+        expect.fail('Expected GatewayTimeoutException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(GatewayTimeoutException);
+        expect(error.message).toBe('Timeout');
+      }
+    });
+
+    it('should handle BadGatewayException and rethrow it', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      mockSocket.emitWithAck.mockRejectedValue(new BadGatewayException('Gateway error'));
+
+      try {
+        await service.sendEncryptedMessageToServer(mockMessage);
+        expect.fail('Expected BadGatewayException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadGatewayException);
+        expect(error.message).toBe('Gateway error');
+      }
+    });
+
+    it('should convert unknown errors to BadGatewayException', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      const unknownError = new Error('Unexpected socket error');
+      mockSocket.emitWithAck.mockRejectedValue(unknownError);
+
+      try {
+        await service.sendEncryptedMessageToServer(mockMessage);
+        expect.fail('Expected BadGatewayException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadGatewayException);
+        expect(error.message).toBe('Unexpected socket error');
+      }
+    });
+
+    it('should convert non-Error exceptions to BadGatewayException', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      const nonErrorException = { code: 'SOCKET_ERROR', details: 'Connection lost' };
+      mockSocket.emitWithAck.mockRejectedValue(nonErrorException);
+
+      try {
+        await service.sendEncryptedMessageToServer(mockMessage);
+        expect.fail('Expected BadGatewayException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadGatewayException);
+        expect(error.message).toBe('Unexpected error sending message to DMR Server');
+      }
+    });
+
+    it('should use correct timeout from configuration', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      const customTimeout = 5000;
+      (service as any).dmrServerConfig.ackTimeoutMs = customTimeout;
+
+      mockSocket.emitWithAck.mockResolvedValue({ status: SocketActEnum.OK });
+
+      await service.sendEncryptedMessageToServer(mockMessage);
+
+      expect(mockSocket.timeout).toHaveBeenCalledWith(customTimeout);
+    });
+
+    it('should handle successful response with additional data', async () => {
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        mockEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      const successResponse = {
+        status: SocketActEnum.OK,
+        messageId: 'server-message-id',
+        timestamp: '2025-06-26T10:00:00.000Z',
+      };
+
+      mockSocket.emitWithAck.mockResolvedValue(successResponse);
+
+      await expect(service.sendEncryptedMessageToServer(mockMessage)).resolves.not.toThrow();
+    });
+
+    it('should handle complex message payloads', async () => {
+      const complexMessage: ExternalServiceMessageDto = {
+        id: 'complex-message-id',
+        recipientId: 'recipient-123',
+        payload: ['payload'],
+      };
+
+      const complexEncryptedMessage = {
+        ...mockEncryptedMessage,
+        payload: 'complex-encrypted-payload',
+      };
+
+      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
+        complexEncryptedMessage,
+      );
+
+      websocketService.isConnected = vi.fn().mockReturnValue(true);
+      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
+
+      mockSocket.emitWithAck.mockResolvedValue({ status: SocketActEnum.OK });
+
+      await service.sendEncryptedMessageToServer(complexMessage);
+
+      expect(service.encryptMessagePayloadFromExternalService).toHaveBeenCalledWith(complexMessage);
+      expect(mockSocket.emitWithAck).toHaveBeenCalledWith(
+        AgentEventNames.MESSAGE_TO_DMR_SERVER,
+        complexEncryptedMessage,
       );
     });
   });
