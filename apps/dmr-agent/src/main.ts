@@ -1,4 +1,4 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -13,6 +13,9 @@ async function bootstrap(): Promise<void> {
 
   const configService = app.get<ConfigService<GlobalConfig>>(ConfigService);
   const appConfig = configService.getOrThrow<AppConfig>(APP_CONFIG_TOKEN);
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
 
   await app.listen(appConfig.port);
 
