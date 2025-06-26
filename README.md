@@ -104,34 +104,39 @@ List of metrics:
 Suggested alert rules:
 
 groups:
+
 - name: dmr-server
   rules:
+
   # Too many disconnected clients suddenly (spike detection)
+
   - alert: DMRHighDisconnectionRate
     expr: increase(dmr_socket_disconnections_total[5m]) > 100
     for: 2m
     labels:
-      severity: warning
+    severity: warning
     annotations:
-      summary: "High rate of disconnections in DMR Server"
+    summary: "High rate of disconnections in DMR Server"
 
   # Low number of active connections (possible outage)
+
   - alert: DMRServerSocketsDown
     expr: dmr_socket_connections_active< 1
     for: 1m
     labels:
-      severity: critical
+    severity: critical
     annotations:
-      summary: "No active socket connections detected on DMR Server"
+    summary: "No active socket connections detected on DMR Server"
 
   # Slow message routing
+
   - alert: DMRServerMessageRoutingLatencyHigh
     expr: histogram_quantile(0.95, rate(dmr_message_processing_duration_seconds[5m])) > 0.5
     for: 2m
     labels:
-      severity: warning
+    severity: warning
     annotations:
-      summary: "95th percentile message routing time exceeds 500ms"
+    summary: "95th percentile message routing time exceeds 500ms"
 
 ### DMR agent
 
