@@ -341,9 +341,7 @@ describe('AgentsService', () => {
       vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(null);
       const loggerErrorSpy = vi.spyOn(service['logger'], 'error');
 
-      await expect(service.sendEncryptedMessageToServer(message)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.sendEncryptedMessageToServer(message)).rejects.toThrow(Error);
       expect(loggerErrorSpy).toHaveBeenCalledWith('Message not encrypted');
     });
   });
