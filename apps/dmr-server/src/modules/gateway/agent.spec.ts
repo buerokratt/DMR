@@ -1,14 +1,20 @@
-import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
-import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Server, Socket } from 'socket.io';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
-import { AuthService } from '../auth/auth.service';
 import { CentOpsService } from '../centops/centops.service';
-import { AgentGateway } from './agent.gateway';
 import { MessageValidatorService } from './message-validator.service';
+import { Logger } from '@nestjs/common';
+import { Server, Socket } from 'socket.io';
+import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
+import { AgentGateway } from './agent.gateway';
+import {
+  AgentEventNames,
+  JwtPayload,
+  SimpleValidationFailureMessage,
+  ValidationErrorType,
+  MessageType,
+} from '@dmr/shared';
+import { AuthService } from '../auth/auth.service';
 
 declare module 'socket.io' {
   interface Socket {
@@ -81,8 +87,8 @@ describe('AgentGateway', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: RabbitMQService, useValue: mockRabbitMQService },
         { provide: MessageValidatorService, useValue: mockMessageValidatorService },
-        { provide: CentOpsService, useValue: mockCentOpsService },
         { provide: RabbitMQMessageService, useValue: mockRabbitMQMessageService },
+        { provide: CentOpsService, useValue: mockCentOpsService },
       ],
     }).compile();
 
@@ -335,6 +341,40 @@ describe('AgentGateway', () => {
       await expect(gateway.handleConnection(client)).rejects.toThrow('disconnect fail');
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
+
+    it('should drop existing connection when a new connection is made by the same agent', async () => {
+      // Create existing socket for agent
+      const existingSocket = createMockSocket(
+        'existing.token',
+        { sub: 'testAgentId' },
+        'existing-socket',
+      );
+      const newClient = createMockSocket('new.token', undefined, 'new-socket');
+
+      // Setup mock server with existing socket
+      (serverMock as any).setMockSockets([['existing-socket', existingSocket]]);
+
+      // Setup mocks for successful authentication and subscription
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
+
+      await gateway.handleConnection(newClient);
+
+      // Verify existing socket was disconnected
+      expect(existingSocket.disconnect).toHaveBeenCalledOnce();
+
+      // Verify we unsubscribed from the old connection's queue
+      expect(rabbitService.unsubscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we subscribed for the new connection
+      expect(rabbitService.subscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we logged the action
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Dropping existing connection for agent testAgentId`),
+      );
+    });
   });
 
   describe('handleDisconnect', () => {
@@ -385,13 +425,13 @@ describe('AgentGateway', () => {
     });
   });
 
-  describe('onRabbitMQMessage', () => {
+  describe('forwardMessageToAgent', () => {
     it('should forward message to the correct agent socket', () => {
       // Setup mock sockets
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
 
-      // Add sockets to the server's sockets collection using our helper method
+      // Add sockets to the server's sockets collection
       (serverMock as any).setMockSockets([
         ['socket-1', mockSocket1],
         ['socket-2', mockSocket2],
@@ -406,10 +446,7 @@ describe('AgentGateway', () => {
         payload: '{"key":"value"}',
       };
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-123',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-123', testMessage);
 
       expect(mockSocket1.emit).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
@@ -434,10 +471,7 @@ describe('AgentGateway', () => {
 
       const warnSpy = vi.spyOn(gateway['logger'], 'warn');
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-789',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-789', testMessage);
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No connected socket found for agent agent-789'),
@@ -464,10 +498,7 @@ describe('AgentGateway', () => {
 
       const errorSpy = vi.spyOn(gateway['logger'], 'error');
 
-      gateway.onRabbitMQMessage({
-        agentId: 'agent-123',
-        message: testMessage,
-      });
+      gateway.forwardMessageToAgent('agent-123', testMessage);
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error forwarding RabbitMQ message to agent: Socket error'),

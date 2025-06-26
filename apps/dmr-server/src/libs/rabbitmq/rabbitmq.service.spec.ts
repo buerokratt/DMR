@@ -16,6 +16,8 @@ vi.mock('amqplib', async () => {
   const onMock = vi.fn();
   const consumeMock = vi.fn();
   const cancelMock = vi.fn();
+  const ackMock = vi.fn(); // Mock for channel.ack
+  const nackMock = vi.fn(); // Mock for channel.nack
 
   const createChannelMock = vi.fn().mockResolvedValue({
     on: onMock,
@@ -24,6 +26,8 @@ vi.mock('amqplib', async () => {
     deleteQueue: deleteQueueMock,
     consume: consumeMock,
     cancel: cancelMock,
+    ack: ackMock, // Add ack to mocked channel
+    nack: nackMock, // Add nack to mocked channel
   });
 
   const closeConnectionMock = vi.fn();
@@ -49,6 +53,8 @@ vi.mock('amqplib', async () => {
       cancelMock,
       closeConnectionMock,
       removeAllListenersConnectionMock,
+      ackMock, // Export ackMock
+      nackMock, // Export nackMock
     },
   };
 });
@@ -56,6 +62,7 @@ vi.mock('amqplib', async () => {
 import { HttpService } from '@nestjs/axios';
 import * as amqplib from 'amqplib';
 import { of, throwError } from 'rxjs';
+import { AgentGateway } from '../../modules/gateway'; // Import AgentGateway
 const {
   assertQueueMock,
   deleteQueueMock,
@@ -64,6 +71,8 @@ const {
   cancelMock,
   closeConnectionMock,
   removeAllListenersConnectionMock,
+  ackMock, // Destructure ackMock
+  nackMock, // Destructure nackMock
 } = (amqplib as any).__mocks;
 
 describe('RabbitMQService', () => {
@@ -72,6 +81,7 @@ describe('RabbitMQService', () => {
   let schedulerRegistry: SchedulerRegistry;
   let cacheManager: Cache;
   let eventEmitter: EventEmitter2;
+  let agentGateway: AgentGateway; // Declare agentGateway
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -114,6 +124,12 @@ describe('RabbitMQService', () => {
           provide: HttpService,
           useValue: { get: vi.fn() },
         },
+        {
+          provide: AgentGateway, // Provide mock for AgentGateway
+          useValue: {
+            forwardMessageToAgent: vi.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -122,6 +138,7 @@ describe('RabbitMQService', () => {
     service = module.get<RabbitMQService>(RabbitMQService);
     schedulerRegistry = module.get<SchedulerRegistry>(SchedulerRegistry);
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+    agentGateway = module.get<AgentGateway>(AgentGateway); // Get AgentGateway instance
 
     await service.onModuleInit();
   });
@@ -327,7 +344,7 @@ describe('RabbitMQService', () => {
 
   describe('Message Forwarding', () => {
     describe('forwardMessageToAgent', () => {
-      it('should parse message content and emit event', () => {
+      it('should parse message content and forward message to AgentGateway', () => {
         const agentId = 'test-agent-id';
         const mockMessage = {
           content: Buffer.from(
@@ -343,13 +360,16 @@ describe('RabbitMQService', () => {
 
         (service as any).forwardMessageToAgent(agentId, mockMessage);
 
-        expect(eventEmitter.emit).toHaveBeenCalledWith(DmrServerEvent.FORWARD_MESSAGE_TO_AGENT, {
+        expect(agentGateway.forwardMessageToAgent).toHaveBeenCalledWith(
           agentId,
-          message: expect.objectContaining({
+          expect.objectContaining({
             id: 'test-message-id',
             senderId: 'test-sender-id',
+            recipientId: agentId,
+            timestamp: '2025-06-18T14:00:00Z',
+            payload: '{"key":"value"}',
           }),
-        });
+        );
       });
 
       it('should handle JSON parsing errors', () => {
@@ -381,7 +401,7 @@ describe('RabbitMQService', () => {
         } as ConsumeMessage;
 
         let capturedCallback: (msg: ConsumeMessage) => void;
-        (service as any)._channel.consume = vi.fn((queue, callback) => {
+        consumeMock.mockImplementation((queue: any, callback: (msg: ConsumeMessage) => void) => {
           capturedCallback = callback;
           return Promise.resolve({ consumerTag: 'test-tag' });
         });
@@ -389,20 +409,15 @@ describe('RabbitMQService', () => {
         vi.spyOn(service, 'checkQueue').mockResolvedValue(true);
 
         const forwardSpy = vi.spyOn(service as any, 'forwardMessageToAgent');
-        (service as any)._channel.ack = vi.fn();
 
         await service.subscribe(queueName);
 
-        expect((service as any)._channel.consume).toHaveBeenCalledWith(
-          queueName,
-          expect.any(Function),
-          { noAck: false },
-        );
+        expect(consumeMock).toHaveBeenCalledWith(queueName, expect.any(Function), { noAck: false });
 
-        capturedCallback(mockMessage);
+        capturedCallback!(mockMessage);
 
         expect(forwardSpy).toHaveBeenCalledWith(queueName, mockMessage);
-        expect((service as any)._channel.ack).toHaveBeenCalledWith(mockMessage);
+        expect(ackMock).toHaveBeenCalledWith(mockMessage);
       });
 
       it('should handle errors and nack messages when processing fails', async () => {
@@ -412,7 +427,7 @@ describe('RabbitMQService', () => {
         } as ConsumeMessage;
 
         let capturedCallback: (msg: ConsumeMessage) => void;
-        (service as any)._channel.consume = vi.fn((queue, callback) => {
+        consumeMock.mockImplementation((queue: any, callback: (msg: ConsumeMessage) => void) => {
           capturedCallback = callback;
           return Promise.resolve({ consumerTag: 'test-tag' });
         });
@@ -423,15 +438,12 @@ describe('RabbitMQService', () => {
           throw new Error('Test error');
         });
 
-        (service as any)._channel.nack = vi.fn();
-        (service as any)._channel.ack = vi.fn();
-
         await service.subscribe(queueName);
 
-        capturedCallback(mockMessage);
+        capturedCallback!(mockMessage);
 
-        expect((service as any)._channel.ack).not.toHaveBeenCalled();
-        expect((service as any)._channel.nack).toHaveBeenCalledWith(mockMessage, false, false);
+        expect(ackMock).not.toHaveBeenCalled();
+        expect(nackMock).toHaveBeenCalledWith(mockMessage, false, false);
       });
     });
   });

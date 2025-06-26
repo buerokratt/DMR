@@ -4,9 +4,9 @@ import { ValidationErrorType } from '../enums';
 export class ValidationErrorDto {
   @IsString()
   @IsNotEmpty()
-  type: ValidationErrorType;
+  type!: ValidationErrorType;
 
   @IsString()
   @IsNotEmpty()
-  message: string;
+  message!: string;
 }
