@@ -99,6 +99,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
       sub: agentId,
       iat: now,
       exp: now + 60,
+      cat: Date.now(),
     };
 
     return this.jwtService.sign(payload, {

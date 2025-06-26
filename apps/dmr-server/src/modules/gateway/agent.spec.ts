@@ -1,19 +1,39 @@
+import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from '../auth/auth.service';
+import { Server, Socket } from 'socket.io';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
+import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
+import { AuthService } from '../auth/auth.service';
 import { CentOpsService } from '../centops/centops.service';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
 import { AgentEncryptedMessageDto, JwtPayload, MessageType } from '@dmr/shared';
 import { AgentGateway } from './agent.gateway';
-import { AgentEventNames } from '@dmr/shared';
+import { MessageValidatorService } from './message-validator.service';
 
 declare module 'socket.io' {
   interface Socket {
     agent: JwtPayload;
   }
 }
+
+const mockCounter = {
+  inc: vi.fn(),
+};
+
+const mockGauge = {
+  inc: vi.fn(),
+  dec: vi.fn(),
+};
+
+const mockHistogram = {
+  observe: vi.fn(),
+  startTimer: vi.fn(),
+};
 
 const mockAuthService = {
   verifyToken: vi.fn(),
@@ -27,8 +47,28 @@ const mockRabbitMQService = {
   },
 };
 
+const mockMetricService = {
+  errorsTotalCounter: mockCounter,
+  activeConnectionGauge: mockGauge,
+  connectionsTotalCounter: mockCounter,
+  disconnectionsTotalCounter: mockCounter,
+  eventsReceivedTotalCounter: mockCounter,
+  eventsSentTotalCounter: mockCounter,
+  socketConnectionDurationSecondsHistogram: mockHistogram,
+  messageProcessingDurationSecondsHistogram: mockHistogram,
+};
+
+const mockRabbitMQMessageService = {
+  sendValidMessage: vi.fn(),
+  sendValidationFailure: vi.fn(),
+};
+
 const mockCentOpsService = {
   getCentOpsConfigurations: vi.fn(),
+};
+
+const mockMessageValidatorService = {
+  validateMessage: vi.fn(),
 };
 
 describe('AgentGateway', () => {
@@ -36,6 +76,8 @@ describe('AgentGateway', () => {
   let authService: AuthService;
   let rabbitService: RabbitMQService;
   let centOpsService: CentOpsService;
+  let messageValidatorService: MessageValidatorService;
+  let rabbitMQMessageService: RabbitMQMessageService;
   let loggerSpy: ReturnType<typeof vi.spyOn>;
   let loggerErrorSpy: ReturnType<typeof vi.spyOn>;
   let serverMock: Server;
@@ -58,6 +100,8 @@ describe('AgentGateway', () => {
       agent: agentPayload || undefined,
       emit: vi.fn(),
       on: vi.fn(),
+      onAny: vi.fn(),
+      onAnyOutgoing: vi.fn(),
       off: vi.fn(),
       once: vi.fn(),
       removeAllListeners: vi.fn(),
@@ -67,10 +111,14 @@ describe('AgentGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [],
       providers: [
         AgentGateway,
         { provide: AuthService, useValue: mockAuthService },
         { provide: RabbitMQService, useValue: mockRabbitMQService },
+        { provide: MessageValidatorService, useValue: mockMessageValidatorService },
+        { provide: RabbitMQMessageService, useValue: mockRabbitMQMessageService },
+        { provide: MetricService, useValue: mockMetricService },
         { provide: CentOpsService, useValue: mockCentOpsService },
       ],
     }).compile();
@@ -78,15 +126,29 @@ describe('AgentGateway', () => {
     gateway = module.get<AgentGateway>(AgentGateway);
     authService = module.get<AuthService>(AuthService);
     rabbitService = module.get<RabbitMQService>(RabbitMQService);
+    messageValidatorService = module.get<MessageValidatorService>(MessageValidatorService);
     centOpsService = module.get<CentOpsService>(CentOpsService);
+    rabbitMQMessageService = module.get(RabbitMQMessageService);
+
+    const mockSocketsMap = new Map<string, Socket>();
 
     serverMock = {
       sockets: {
-        sockets: new Map<string, Socket>(),
-        get: vi.fn((id: string) => serverMock.sockets.sockets.get(id)),
+        get sockets() {
+          return mockSocketsMap;
+        },
+        get: vi.fn((id: string) => mockSocketsMap.get(id)),
       },
       emit: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
     } as any as Server;
+
+    (serverMock as any).setMockSockets = (socketsArray: [string, Socket][]) => {
+      mockSocketsMap.clear();
+      socketsArray.forEach(([id, socket]) => mockSocketsMap.set(id, socket));
+    };
+
     gateway.server = serverMock;
 
     loggerSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
@@ -96,8 +158,6 @@ describe('AgentGateway', () => {
   });
 
   afterEach(() => {
-    loggerSpy.mockRestore();
-    loggerErrorSpy.mockRestore();
     vi.restoreAllMocks();
   });
 
@@ -106,7 +166,7 @@ describe('AgentGateway', () => {
   });
 
   describe('handleConnection', () => {
-    const mockPayload = { sub: 'testAgentId', iat: 123, exp: 123 };
+    const mockPayload = { sub: 'testAgentId', iat: 123, exp: 123, cat: 175 };
 
     it('should allow connection and emit full agent list when consume is truthy', async () => {
       const token = 'valid.jwt.token';
@@ -312,6 +372,40 @@ describe('AgentGateway', () => {
       await expect(gateway.handleConnection(client)).rejects.toThrow('disconnect fail');
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
+
+    it('should drop existing connection when a new connection is made by the same agent', async () => {
+      // Create existing socket for agent
+      const existingSocket = createMockSocket(
+        'existing.token',
+        { sub: 'testAgentId' },
+        'existing-socket',
+      );
+      const newClient = createMockSocket('new.token', undefined, 'new-socket');
+
+      // Setup mock server with existing socket
+      (serverMock as any).setMockSockets([['existing-socket', existingSocket]]);
+
+      // Setup mocks for successful authentication and subscription
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
+
+      await gateway.handleConnection(newClient);
+
+      // Verify existing socket was disconnected
+      expect(existingSocket.disconnect).toHaveBeenCalledOnce();
+
+      // Verify we unsubscribed from the old connection's queue
+      expect(rabbitService.unsubscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we subscribed for the new connection
+      expect(rabbitService.subscribe).toHaveBeenCalledWith('testAgentId');
+
+      // Verify we logged the action
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`Dropping existing connection for agent testAgentId`),
+      );
+    });
   });
 
   describe('handleDisconnect', () => {
@@ -362,27 +456,128 @@ describe('AgentGateway', () => {
     });
   });
 
-  describe('handleMessage', () => {
-    it('should log simple message', () => {
-      const client = createMockSocket(undefined, { sub: 'a' }, 'mid');
-      gateway.handleMessage(client, 'Hello');
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: Hello`);
+  describe('forwardMessageToAgent', () => {
+    it('should forward message to the correct agent socket', () => {
+      // Setup mock sockets
+      const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
+      const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
+
+      // Add sockets to the server's sockets collection
+      (serverMock as any).setMockSockets([
+        ['socket-1', mockSocket1],
+        ['socket-2', mockSocket2],
+      ]);
+
+      const testMessage = {
+        id: 'msg-123',
+        timestamp: '2025-06-18T14:00:00Z',
+        senderId: 'server-id',
+        recipientId: 'agent-123',
+        type: MessageType.Message,
+        payload: '{"key":"value"}',
+      };
+
+      gateway.forwardMessageToAgent('agent-123', testMessage);
+
+      expect(mockSocket1.emit).toHaveBeenCalledWith(
+        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+        testMessage,
+      );
+
+      expect(mockSocket2.emit).not.toHaveBeenCalled();
     });
 
-    it('should cover null/undefined/object/number/boolean payloads', () => {
-      const client = createMockSocket(undefined, { sub: 'a' }, 'mid');
-      gateway.handleMessage(client, null as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: null`);
-      gateway.handleMessage(client, undefined as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: undefined`);
-      gateway.handleMessage(client, { foo: 'bar' } as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: [object Object]`);
-      gateway.handleMessage(client, 123 as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: 123`);
-      gateway.handleMessage(client, true as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: true`);
-      gateway.handleMessage(client, false as any);
-      expect(loggerSpy).toHaveBeenCalledWith(`mid sent message to DMR: false`);
+    it('should log warning when no socket found for agent', () => {
+      // Setup server with no matching socket
+      (serverMock as any).setMockSockets([]);
+
+      const testMessage = {
+        id: 'msg-123',
+        timestamp: '2025-06-18T14:00:00Z',
+        senderId: 'server-id',
+        recipientId: 'agent-789',
+        type: MessageType.Message,
+        payload: '{"key":"value"}',
+      };
+
+      const warnSpy = vi.spyOn(gateway['logger'], 'warn');
+
+      gateway.forwardMessageToAgent('agent-789', testMessage);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('No connected socket found for agent agent-789'),
+      );
+    });
+
+    it('should handle errors during message forwarding', () => {
+      // Setup mock socket that throws on emit
+      const mockSocket = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
+      (mockSocket.emit as any).mockImplementation(() => {
+        throw new Error('Socket error');
+      });
+
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+
+      const testMessage = {
+        id: 'msg-123',
+        timestamp: '2025-06-18T14:00:00Z',
+        senderId: 'server-id',
+        recipientId: 'agent-123',
+        type: MessageType.Message,
+        payload: '{"key":"value"}',
+      };
+
+      const errorSpy = vi.spyOn(gateway['logger'], 'error');
+
+      gateway.forwardMessageToAgent('agent-123', testMessage);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error forwarding RabbitMQ message to agent: Socket error'),
+      );
+    });
+  });
+
+  describe('findSocketByAgentId', () => {
+    it('should return socket for the specified agent ID', () => {
+      // Setup mock sockets
+      const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
+      const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
+
+      (serverMock as any).setMockSockets([
+        ['socket-1', mockSocket1],
+        ['socket-2', mockSocket2],
+      ]);
+
+      const socket = (gateway as any).findSocketByAgentId('agent-123');
+
+      expect(socket).toBe(mockSocket1);
+    });
+
+    it('should return null when no socket found', () => {
+      // Setup server with no matching socket
+      (serverMock as any).setMockSockets([
+        ['socket-2', createMockSocket('token2', { sub: 'agent-456' }, 'socket-2')],
+      ]);
+
+      const socket = (gateway as any).findSocketByAgentId('agent-789');
+
+      expect(socket).toBeNull();
+    });
+
+    it('should return only the first socket when multiple sockets exist for the same agent', () => {
+      // Setup multiple sockets for the same agent
+      const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
+      const mockSocket3 = createMockSocket('token3', { sub: 'agent-123' }, 'socket-3');
+
+      (serverMock as any).setMockSockets([
+        ['socket-1', mockSocket1],
+        ['socket-3', mockSocket3],
+      ]);
+
+      const socket = (gateway as any).findSocketByAgentId('agent-123');
+
+      // Should return the first socket found
+      expect(socket).toBe(mockSocket1);
     });
   });
 

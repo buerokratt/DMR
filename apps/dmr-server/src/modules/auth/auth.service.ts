@@ -1,8 +1,8 @@
+import { JwtPayload } from '@dmr/shared';
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { CentOpsService } from '../centops/centops.service';
 import { DecodedJwt, JwtHeader } from './interfaces/headers.interface';
-import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from '@dmr/shared';
 
 @Injectable()
 export class AuthService {
@@ -41,7 +41,7 @@ export class AuthService {
       throw new BadRequestException('Token sub and kid do not match');
     }
 
-    return verifiedToken;
+    return Object.assign(verifiedToken, { cat: Date.now() });
   }
 
   private decodeJwtHeader(token: string): JwtHeader | null {

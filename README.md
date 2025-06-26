@@ -59,6 +59,7 @@ graph TD
 - **Cannot** read the message contents, these are encrypted by the DMR agents.
 - There can be several instances of DMR server running, depending on load.
 - In the future, can potentially be extended to perform operations — like applying policies — on incoming and outgoing messages.
+- Includes support for Prometheus-based monitoring to help track the real-time health and behavior of the DMR server, specifically around WebSocket activity and message processing.
 
 ### RabbitMQ
 
@@ -66,6 +67,80 @@ graph TD
 - Has a dead letter queue for messages that failed to deliver.
 - Has RabbitMQ UI-based monitoring tools set up.
 - Supports RabbitMQ clustering for scalability.
+- https://www.rabbitmq.com/kubernetes/operator/operator-monitoring
+
+## Prometheus
+
+### DMR server
+
+List of metrics:
+
+- **`dmr_socket_connections_active`** | `gauge`
+  Current number of active Socket.IO connections
+
+- **`dmr_socket_connections_total`** | `counter`
+  Total number of established connections
+
+- **`dmr_socket_disconnections_total`** | `counter`
+  Total number of disconnections
+
+- **`dmr_socket_connection_duration_seconds`** | `histogram`
+  Duration of a socket connection session
+
+- **`dmr_socket_errors_total`** | `counter`
+  Total number of connection errors
+
+- **`dmr_socket_events_received_total`** | `counter`
+  Total events received from clients
+  _(labels: `event`, `namespace`)_
+
+- **`dmr_socket_events_sent_total`** | `counter`
+  Total events sent to clients
+  _(labels: `event`, `namespace`)_
+
+- **`dmr_message_processing_duration_seconds`** | `histogram`
+  Time to process/forward a single message
+
+Suggested alert rules:
+
+```yaml
+groups:
+  - name: dmr-server
+    rules:
+      # Too many disconnected clients suddenly (spike detection)
+
+      - alert: DMRHighDisconnectionRate
+        expr: increase(dmr_socket_disconnections_total[5m]) > 100
+        for: 2m
+        labels:
+        severity: warning
+        annotations:
+        summary: 'High rate of disconnections in DMR Server'
+
+      # Low number of active connections (possible outage)
+
+      - alert: DMRServerSocketsDown
+        expr: dmr_socket_connections_active< 1
+        for: 1m
+        labels:
+        severity: critical
+        annotations:
+        summary: 'No active socket connections detected on DMR Server'
+
+      # Slow message routing
+
+      - alert: DMRServerMessageRoutingLatencyHigh
+        expr: histogram_quantile(0.95, rate(dmr_message_processing_duration_seconds[5m])) > 0.5
+        for: 2m
+        labels:
+        severity: warning
+        annotations:
+        summary: '95th percentile message routing time exceeds 500ms'
+```
+
+### DMR agent
+
+---
 
 ## Available Scripts
 

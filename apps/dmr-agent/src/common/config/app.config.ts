@@ -1,4 +1,5 @@
 import { Utils } from '@dmr/shared';
+import { LogLevel } from '@nestjs/common';
 import { ConfigType, registerAs } from '@nestjs/config';
 import Joi from 'joi';
 
@@ -10,10 +11,16 @@ const variables = Utils.validateObject(
   {
     port: Number(process.env.PORT),
     environment: process.env.ENVIRONMENT as Environment,
+    loggerLogLevels: (process.env.LOGGER_LOG_LEVELS?.split(',') as LogLevel[]) || undefined,
+    loggerColors: process.env.LOGGER_COLORS === 'true',
   },
   {
     port: Joi.number().default(5000),
     environment: Joi.string().valid('development', 'production').default('development'),
+    loggerLogLevels: Joi.array()
+      .items(Joi.string().valid('log', 'error', 'warn', 'debug', 'verbose'))
+      .default(['error', 'warn', 'log']),
+    loggerColors: Joi.boolean().default(false),
   },
 );
 

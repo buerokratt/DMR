@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: dmr-rabbitmq
+    restart: always
+    ports:
+      - '8070:5672' # AMQP port
+      - '8071:15672' # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=pass
+    volumes:
+      - rabbitmq_lib:/var/lib/rabbitmq/
+      - rabbitmq_log:/var/log/rabbitmq
+    configs:
+      - source: rabbitmq-plugins
+        target: /etc/rabbitmq/enabled_plugins
+    networks:
+      - bykstack
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dmr-server:
+    build:
+      context: .
+      dockerfile: apps/dmr-server/Dockerfile
+    container_name: dmr-server
+    restart: always
+    ports:
+      - '8072:5000'
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - PORT=5000
+      - ENVIRONMENT=development
+      - LOGGER_COLORS=true
+      - LOGGER_LOG_LEVELS=error,warn,log
+      - WEB_SOCKET_MAX_DISCONNECTION_DURATION=120000
+      - CENTOPS_CONFIGURATION_URL=http://localhost:3000/centops/clients
+      - CENTOPS_CONFIGURATION_CRON_TIME=*/10 * * * * *
+      - RABBITMQ_DEFAULT_PORT=5672
+      - RABBITMQ_DEFAULT_HOST=rabbitmq
+      - RABBITMQ_DEFAULT_TTL=300000
+      - RABBITMQ_DEFAULT_DLQ_TTL=86400000
+      - RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL=5000
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=pass
+      - RABBITMQ_VALIDATION_FAILURES_TTL=86400000
+      - MOCK_DMR_AGENT_A_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwP7rE5Yw0QyQ8w0p8v1v\nwQIDAQAB\n-----END PUBLIC KEY-----
+      - MOCK_DMR_AGENT_B_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs8u5Qk7y1nK8F8cJ7l7a\nwQIDAQAB\n-----END PUBLIC KEY-----
+      - MOCK_DMR_AGENT_A_ID=d3b07384-d9a0-4c3f-a4e2-123456789abc
+      - MOCK_DMR_AGENT_B_ID=a1e45678-12bc-4ef0-9876-def123456789
+    networks:
+      - bykstack
+
+  dmr-agent-a:
+    build:
+      context: .
+      dockerfile: apps/dmr-agent/Dockerfile
+    container_name: dmr-agent-a
+    restart: always
+    ports:
+      - '8073:5001' # Agent 1 port
+    depends_on:
+      - dmr-server
+    environment:
+      - PORT=5001
+      - ENVIRONMENT=development
+      - LOGGER_COLORS=true
+      - LOGGER_LOG_LEVELS=error,warn,log
+      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:5000/v1/dmr-agent-events
+      - WEBSOCKET_RECONNECTION_DELAY=1000
+      - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
+      - AGENT_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAzswOj9MYib7AdrZ4Xc5Eoz/wS6RwHaN1YxZq+rF9c8o2NCtp\nYs3DLOia8UdS3CQXyPjBfJlQbCiJpP8/FTd3SYRlkU0=\n-----END RSA PRIVATE KEY-----
+      - AGENT_ID=cc5b7b04-ba33-4423-ba26-ccc25441db42
+    networks:
+      - bykstack
+
+  dmr-agent-b:
+    build:
+      context: .
+      dockerfile: apps/dmr-agent/Dockerfile
+    container_name: dmr-agent-b
+    restart: always
+    ports:
+      - '8074:5001' # Agent 2 port
+    depends_on:
+      - dmr-server
+    environment:
+      - PORT=5001
+      - ENVIRONMENT=development
+      - LOGGER_COLORS=true
+      - LOGGER_LOG_LEVELS=error,warn,log
+      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:5000/v1/dmr-agent-events
+      - WEBSOCKET_RECONNECTION_DELAY=1000
+      - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
+      - AGENT_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAzswOj9MYib7AdrZ4Xc5Eoz/wS6RwHaN1YxZq+rF9c8o2NCtp\nYs3DLOia8UdS3CQXyPjBfJlQbCiJpP8/FTd3SYRlkU0=\n-----END RSA PRIVATE KEY-----
+      - AGENT_ID=dd6c8b15-cb44-5534-cb37-ddd36552ec53
+    networks:
+      - bykstack
+
+configs:
+  rabbitmq-plugins:
+    content: '[rabbitmq_management].'
+
+volumes:
+  rabbitmq_lib:
+  rabbitmq_log:
+
+networks:
+  bykstack:
+    name: bykstack
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1400
