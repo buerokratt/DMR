@@ -103,6 +103,7 @@ List of metrics:
 
 Suggested alert rules:
 
+```yaml
 groups:
 
 - name: dmr-server
@@ -137,6 +138,7 @@ groups:
     severity: warning
     annotations:
     summary: "95th percentile message routing time exceeds 500ms"
+```
 
 ### DMR agent
 
