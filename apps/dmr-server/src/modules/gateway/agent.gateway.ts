@@ -2,8 +2,8 @@ import {
   AgentEventNames,
   AgentMessageDto,
   DmrServerEvent,
-  ISocketActPayload,
-  SimpleValidationFailureMessage,
+  ISocketAckPayload,
+  SocketAckStatusEnum,
   ValidationErrorDto,
 } from '@dmr/shared';
 import { BadRequestException, forwardRef, Inject, Logger } from '@nestjs/common';
@@ -110,9 +110,15 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const response = (await socket.emitWithAck(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
         message,
-      )) as ISocketActPayload;
+      )) as ISocketAckPayload;
 
-      console.log(response);
+      if (response.status === SocketAckStatusEnum.ERROR) {
+        await this.rabbitMQMessageService.sendValidationFailure(
+          message,
+          response.errors!,
+          message.receivedAt ?? new Date().toISOString(),
+        );
+      }
 
       this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
     } catch (error) {
@@ -143,18 +149,6 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error: unknown) {
       await this.handleMessageError(error);
     }
-  }
-
-  @SubscribeMessage(AgentEventNames.MESSAGE_PROCESSING_FAILED)
-  async handleError(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: SimpleValidationFailureMessage,
-  ) {
-    await this.rabbitMQMessageService.sendValidationFailure(
-      data.message,
-      data.errors,
-      data.receivedAt,
-    );
   }
 
   private async handleValidMessage(

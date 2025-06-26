@@ -1,3 +1,3 @@
-import { ISocketActPayload } from './socket-act-payload.interface';
+import { ISocketAckPayload } from './socket-act-payload.interface';
 
-export type ISocketActCallback = (payload: ISocketActPayload) => void;
+export type ISocketActCallback = (payload: ISocketAckPayload) => void;

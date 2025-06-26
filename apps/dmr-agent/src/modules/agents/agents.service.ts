@@ -9,7 +9,7 @@ import {
   IAgentList,
   ISocketActCallback,
   MessageType,
-  SimpleValidationFailureMessage,
+  SocketAckStatusEnum,
   Utils,
   ValidationErrorDto,
   ValidationErrorType,
@@ -64,8 +64,8 @@ export class AgentsService implements OnModuleInit {
 
     socket.on(
       AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-      (data: AgentEncryptedMessageDto, cb: ISocketActCallback) => {
-        void this.handleMessageFromDMRServerEvent(data, cb);
+      (data: AgentEncryptedMessageDto, ackCb: ISocketActCallback) => {
+        void this.handleMessageFromDMRServerEvent(data, ackCb);
       },
     );
   }
@@ -136,7 +136,7 @@ export class AgentsService implements OnModuleInit {
 
   private async handleMessageFromDMRServerEvent(
     message: AgentMessageDto,
-    cb: ISocketActCallback,
+    ackCb: ISocketActCallback,
   ): Promise<void> {
     const errors: ValidationErrorDto[] = [];
 
@@ -149,9 +149,11 @@ export class AgentsService implements OnModuleInit {
           type: ValidationErrorType.DECRYPTION_FAILED,
           message: 'Something went wrong while decrypting the message.',
         });
-      } else {
-        this.logger.log('Message is decrypted');
       }
+
+      this.logger.log('Message is decrypted');
+
+      ackCb({ status: SocketAckStatusEnum.OK });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
@@ -160,21 +162,10 @@ export class AgentsService implements OnModuleInit {
         type: ValidationErrorType.SIGNATURE_VALIDATION_FAILED,
         message: errorMessage,
       });
-    }
-
-    if (errors.length !== 0) {
-      const error: SimpleValidationFailureMessage = {
-        id: message.id,
-        errors: errors,
-        message: message,
-        receivedAt: message.receivedAt || new Date().toISOString(),
-      };
-
-      this.websocketService.getSocket()?.emit(AgentEventNames.MESSAGE_PROCESSING_FAILED, error);
-
-      this.logger.warn(
-        `Emitted ${AgentEventNames.MESSAGE_PROCESSING_FAILED} event for message ${message.id} with errors: ${JSON.stringify(errors)}`,
-      );
+    } finally {
+      if (errors.length !== 0) {
+        ackCb({ status: SocketAckStatusEnum.ERROR, errors });
+      }
     }
   }
 

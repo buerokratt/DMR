@@ -1,11 +1,4 @@
-import {
-  AgentEventNames,
-  IAgent,
-  IAgentList,
-  MessageType,
-  Utils,
-  ValidationErrorType,
-} from '@dmr/shared';
+import { IAgent, IAgentList, MessageType, Utils } from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as classTransformer from 'class-transformer';
@@ -267,45 +260,6 @@ describe('AgentsService', () => {
       } catch (error) {
         expect(error instanceof Error ? error.message : '').toContain('Decrypt fail');
       }
-    });
-  });
-
-  describe('handleMessageFromDMRServerEvent', () => {
-    it('should emit MESSAGE_PROCESSING_FAILED if decryption fails', async () => {
-      const mockSender = {
-        id: 'sender-id',
-        authenticationCertificate: 'mock-cert',
-      };
-
-      const message = {
-        id: 'msg-1',
-        type: MessageType.Message,
-        payload: 'encrypted-payload',
-        senderId: mockSender.id,
-        recipientId: agentConfigMock.id,
-        timestamp: new Date().toISOString(),
-      };
-
-      const emitSpy = vi.fn();
-
-      vi.spyOn(websocketService, 'getSocket').mockReturnValue({
-        emit: emitSpy,
-      } as any);
-
-      vi.spyOn(service as any, 'decryptMessagePayloadFromDMRServer').mockResolvedValueOnce(null);
-
-      await (service as any).handleMessageFromDMRServerEvent(message);
-
-      expect(emitSpy).toHaveBeenCalledWith(
-        AgentEventNames.MESSAGE_PROCESSING_FAILED,
-        expect.objectContaining({
-          errors: expect.arrayContaining([
-            expect.objectContaining({
-              type: ValidationErrorType.DECRYPTION_FAILED,
-            }),
-          ]),
-        }),
-      );
     });
   });
 });

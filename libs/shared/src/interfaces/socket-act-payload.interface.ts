@@ -1,6 +1,7 @@
-import { SocketActEnum } from '../enums';
+import { ValidationErrorDto } from '../dtos';
+import { SocketAckStatusEnum } from '../enums';
 
-export interface ISocketActPayload {
-  status: SocketActEnum;
-  error?: string;
+export interface ISocketAckPayload {
+  status: SocketAckStatusEnum;
+  errors?: ValidationErrorDto[];
 }
