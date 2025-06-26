@@ -2,8 +2,8 @@ import { MessageType } from '@dmr/shared';
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CentOpsService } from '../centops/centops.service';
 import { MessageValidatorService } from './message-validator.service';
+import { CentOpsService } from '../centops/centops.service';
 
 const mockCentOpsService = {
   getCentOpsConfigurationByClientId: vi.fn().mockImplementation(async (id: string) => {

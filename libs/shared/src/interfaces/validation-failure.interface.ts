@@ -1,8 +1,8 @@
-import { ValidationErrorDto } from '../dtos/validation-failure-message.dto';
+import { ValidationErrorDto } from '../dtos';
 
 export interface SimpleValidationFailureMessage {
-  id: string;
-  errors: ValidationErrorDto[];
-  receivedAt: string;
-  message: unknown;
+  id: string; // Message id
+  errors: ValidationErrorDto[]; // Errors
+  receivedAt: string; // Message received at
+  message: unknown; // Message
 }

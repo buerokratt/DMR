@@ -1,4 +1,10 @@
-import { AgentEventNames, AgentMessageDto, DmrServerEvent, ValidationErrorDto } from '@dmr/shared';
+import {
+  AgentEventNames,
+  AgentMessageDto,
+  DmrServerEvent,
+  SimpleValidationFailureMessage,
+  ValidationErrorDto,
+} from '@dmr/shared';
 import {
   BadRequestException,
   forwardRef,
@@ -195,6 +201,18 @@ export class AgentGateway
     }
 
     end();
+  }
+
+  @SubscribeMessage(AgentEventNames.MESSAGE_PROCESSING_FAILED)
+  async handleError(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: SimpleValidationFailureMessage,
+  ) {
+    await this.rabbitMQMessageService.sendValidationFailure(
+      data.message,
+      data.errors,
+      data.receivedAt,
+    );
   }
 
   private async handleValidMessage(
