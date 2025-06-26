@@ -22,9 +22,9 @@ import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
-export class AgentsService implements OnModuleInit {
+export class MessagesService implements OnModuleInit {
   private readonly AGENTS_CACHE_KEY = 'DMR_AGENTS_LIST';
-  private readonly logger = new Logger(AgentsService.name);
+  private readonly logger = new Logger(MessagesService.name);
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
@@ -187,7 +187,7 @@ export class AgentsService implements OnModuleInit {
 
     if (!encryptedMessage) {
       this.logger.error('Message not encrypted');
-      throw new BadRequestException('Message not encrypted');
+      throw new Error('Message not encrypted');
     }
 
     this.logger.log(`Message encrypted successfully`);

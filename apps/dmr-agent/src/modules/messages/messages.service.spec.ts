@@ -13,11 +13,11 @@ import * as classValidator from 'class-validator';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentConfig, AgentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
-import { AgentsService } from './agents.service';
+import { MessagesService } from './messages.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('AgentsService', () => {
-  let service: AgentsService;
+  let service: MessagesService;
   let websocketService: WebsocketService;
   let cacheManager: Cache;
   let agentConfigMock: AgentConfig;
@@ -50,7 +50,7 @@ describe('AgentsService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AgentsService,
+        MessagesService,
         {
           provide: agentConfig.KEY,
           useValue: {
@@ -72,7 +72,7 @@ describe('AgentsService', () => {
       ],
     }).compile();
 
-    service = module.get(AgentsService);
+    service = module.get(MessagesService);
     websocketService = module.get(WebsocketService);
     cacheManager = module.get(CACHE_MANAGER);
     agentConfigMock = module.get(agentConfig.KEY);
