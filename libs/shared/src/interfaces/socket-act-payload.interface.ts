@@ -1,7 +1,7 @@
 import { ValidationErrorDto } from '../dtos';
-import { SocketAckStatusEnum } from '../enums';
+import { SocketAckStatus } from '../enums';
 
 export interface ISocketAckPayload {
-  status: SocketAckStatusEnum;
+  status: SocketAckStatus;
   errors?: ValidationErrorDto[];
 }

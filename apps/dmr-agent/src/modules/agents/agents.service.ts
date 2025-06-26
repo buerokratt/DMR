@@ -9,7 +9,7 @@ import {
   IAgentList,
   ISocketActCallback,
   MessageType,
-  SocketAckStatusEnum,
+  SocketAckStatus,
   Utils,
   ValidationErrorDto,
   ValidationErrorType,
@@ -17,8 +17,10 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
+import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { firstValueFrom } from 'rxjs';
 import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 
@@ -31,6 +33,7 @@ export class AgentsService implements OnModuleInit {
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly websocketService: WebsocketService,
+    private readonly httpService: HttpService,
   ) {}
 
   onModuleInit(): void {
@@ -144,28 +147,52 @@ export class AgentsService implements OnModuleInit {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
       if (!decryptedMessage) {
-        this.logger.error(`Something went wrong while decrypting the message`);
+        this.logger.error('Failed to decrypt message from DMR Server');
         errors.push({
           type: ValidationErrorType.DECRYPTION_FAILED,
-          message: 'Something went wrong while decrypting the message.',
+          message: 'Failed to decrypt message from DMR Server',
         });
+      } else {
+        const outgoingMessage: ExternalServiceMessageDto = {
+          id: message.id,
+          recipientId: message.recipientId,
+          payload: decryptedMessage.payload,
+        };
+
+        await this.handleOutgoingMessage(outgoingMessage);
+
+        this.logger.log(`Successfully processed and forwarded message ${message.id}`);
       }
 
       this.logger.log('Message is decrypted');
 
-      return ackCb({ status: SocketAckStatusEnum.OK });
+      return ackCb({ status: SocketAckStatus.OK });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
 
       errors.push({
-        type: ValidationErrorType.SIGNATURE_VALIDATION_FAILED,
+        type: ValidationErrorType.DECRYPTION_FAILED,
         message: errorMessage,
       });
     }
 
     if (errors.length !== 0) {
-      return ackCb({ status: SocketAckStatusEnum.ERROR, errors });
+      return ackCb({ status: SocketAckStatus.ERROR, errors });
+    }
+  }
+
+  private async handleOutgoingMessage(message: ExternalServiceMessageDto): Promise<void> {
+    if (!this.agentConfig.outgoingMessageEndpoint) {
+      throw new Error('Outgoing message endpoint not configured');
+    }
+    try {
+      await firstValueFrom(
+        this.httpService.post(this.agentConfig.outgoingMessageEndpoint, message),
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to handle outgoing message: ${errorMessage}`);
     }
   }
 

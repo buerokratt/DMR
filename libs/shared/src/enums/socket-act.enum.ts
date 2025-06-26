@@ -1,4 +1,4 @@
-export enum SocketAckStatusEnum {
+export enum SocketAckStatus {
   ERROR = 'error',
   OK = 'ok',
 }

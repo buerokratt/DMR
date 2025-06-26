@@ -3,10 +3,17 @@ import {
   AgentMessageDto,
   DmrServerEvent,
   ISocketAckPayload,
-  SocketAckStatusEnum,
+  SocketAckStatus,
   ValidationErrorDto,
 } from '@dmr/shared';
-import { BadRequestException, forwardRef, Inject, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -18,6 +25,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
 import { AuthService } from '../auth/auth.service';
@@ -32,11 +40,14 @@ import { MessageValidatorService } from './message-validator.service';
     skipMiddlewares: true,
   },
 })
-export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class AgentGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy
+{
   @WebSocketServer()
   server!: Server;
 
   private readonly logger = new Logger(AgentGateway.name);
+  private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
     private readonly authService: AuthService,
@@ -46,7 +57,43 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject(forwardRef(() => RabbitMQMessageService))
     private readonly rabbitMQMessageService: RabbitMQMessageService,
     private readonly centOpsService: CentOpsService,
+    private readonly metricService: MetricService,
   ) {}
+
+  onModuleInit() {
+    this.handleConnectionEvent = (socket: Socket) => {
+      const namespace = socket.nsp.name;
+
+      socket.onAny((event: string) => {
+        if (event === 'error') {
+          this.metricService.errorsTotalCounter.inc(1);
+        }
+
+        const ignored = ['ping', 'disconnect', 'connect', 'error'];
+        if (!ignored.includes(event)) {
+          this.metricService.eventsReceivedTotalCounter.inc({ event, namespace });
+        }
+      });
+
+      socket.onAnyOutgoing((event: string) => {
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
+      });
+    };
+
+    this.server.on('connection', this.handleConnectionEvent);
+
+    const emit = (event: string, ...arguments_: unknown[]) => {
+      this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
+
+      return this.server.emit(event, ...arguments_);
+    };
+
+    this.server.emit = emit;
+  }
+
+  onModuleDestroy() {
+    this.server.off('connection', this.handleConnectionEvent);
+  }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {
     try {
@@ -76,6 +123,9 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const centOpsConfigurations = await this.centOpsService.getCentOpsConfigurations();
       this.server.emit(AgentEventNames.FULL_AGENT_LIST, centOpsConfigurations);
+
+      this.metricService.activeConnectionGauge.inc(1);
+      this.metricService.connectionsTotalCounter.inc(1);
     } catch {
       this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
       client.disconnect();
@@ -83,10 +133,20 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleDisconnect(@ConnectedSocket() client: Socket): Promise<void> {
+    this.metricService.activeConnectionGauge.dec(1);
+    this.metricService.disconnectionsTotalCounter.inc(1);
+
     const agentId = client?.agent?.sub;
+    const connectedAt = client?.agent?.cat;
 
     if (agentId) {
       await this.rabbitService.unsubscribe(agentId);
+    }
+
+    if (connectedAt) {
+      const durationSeconds = (Date.now() - connectedAt) / 1000;
+
+      this.metricService.socketConnectionDurationSecondsHistogram.observe(durationSeconds);
     }
 
     this.logger.log(`Agent disconnected: ${agentId} (Socket ID: ${client.id})`);
@@ -99,7 +159,10 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log('Agent configurations updated and emitted to all connected clients');
   }
 
-  public async forwardMessageToAgent(agentId: string, message: AgentMessageDto): Promise<void> {
+  public async forwardMessageToAgent(
+    agentId: string,
+    message: AgentMessageDto,
+  ): Promise<ISocketAckPayload | null> {
     try {
       const socket = this.findSocketByAgentId(agentId);
       if (!socket) {
@@ -112,18 +175,21 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
         message,
       )) as ISocketAckPayload;
 
-      if (response.status === SocketAckStatusEnum.ERROR) {
+      if (response.status === SocketAckStatus.ERROR) {
         await this.rabbitMQMessageService.sendValidationFailure(
           message,
-          response.errors!,
+          response.errors,
           message.receivedAt ?? new Date().toISOString(),
         );
       }
 
       this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
+      return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error forwarding RabbitMQ message to agent: ${errorMessage}`);
+
+      return null;
     }
   }
 
@@ -143,12 +209,18 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: unknown,
   ): Promise<void> {
     const receivedAt = new Date().toISOString();
+    const end = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+      event: AgentEventNames.MESSAGE_TO_DMR_SERVER,
+    });
+
     try {
       const result = await this.messageValidator.validateMessage(data, receivedAt);
       await this.handleValidMessage(result, receivedAt);
     } catch (error: unknown) {
       await this.handleMessageError(error);
     }
+
+    end();
   }
 
   private async handleValidMessage(

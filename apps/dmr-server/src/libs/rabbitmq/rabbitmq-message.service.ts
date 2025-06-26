@@ -14,9 +14,9 @@ export class RabbitMQMessageService implements OnModuleInit {
   }
 
   constructor(
-    private readonly rabbitMQService: RabbitMQService,
     @Inject(rabbitMQConfig.KEY)
     private readonly rabbitMQConfig: RabbitMQConfig,
+    private readonly rabbitMQService: RabbitMQService,
   ) {}
 
   async onModuleInit(): Promise<void> {
