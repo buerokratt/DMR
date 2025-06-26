@@ -7,13 +7,7 @@ import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
 import { AgentGateway } from './agent.gateway';
-import {
-  AgentEventNames,
-  JwtPayload,
-  SimpleValidationFailureMessage,
-  ValidationErrorType,
-  MessageType,
-} from '@dmr/shared';
+import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
 import { AuthService } from '../auth/auth.service';
 
 declare module 'socket.io' {
@@ -442,7 +436,7 @@ describe('AgentGateway', () => {
         timestamp: '2025-06-18T14:00:00Z',
         senderId: 'server-id',
         recipientId: 'agent-123',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: '{"key":"value"}',
       };
 
@@ -465,7 +459,7 @@ describe('AgentGateway', () => {
         timestamp: '2025-06-18T14:00:00Z',
         senderId: 'server-id',
         recipientId: 'agent-789',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: '{"key":"value"}',
       };
 
@@ -492,7 +486,7 @@ describe('AgentGateway', () => {
         timestamp: '2025-06-18T14:00:00Z',
         senderId: 'server-id',
         recipientId: 'agent-123',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: '{"key":"value"}',
       };
 

@@ -133,7 +133,7 @@ describe('RabbitMQMessageService', () => {
       id: 'test-message-id',
       senderId: 'sender-123',
       recipientId: 'recipient-456',
-      type: MessageType.Message,
+      type: MessageType.ChatMessage,
       timestamp: '2023-01-01T12:00:00.000Z',
       content: { test: 'data' },
       payload: 'test-payload',
