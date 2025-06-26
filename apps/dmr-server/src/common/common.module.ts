@@ -1,9 +1,11 @@
+import { HttpModule } from '@nestjs/axios';
+import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { configs } from './config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { CacheModule } from '@nestjs/cache-manager';
-import { HttpModule } from '@nestjs/axios';
+import { MetricModule } from '../libs/metrics';
+import { configs } from './config';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { HttpModule } from '@nestjs/axios';
       isGlobal: true,
     }),
     HttpModule.register({ global: true }),
+    EventEmitterModule.forRoot({ global: true }),
+    MetricModule,
   ],
 })
 export class CommonModule {}
