@@ -6,21 +6,24 @@ import {
   Utils,
   ValidationErrorType,
 } from '@dmr/shared';
+import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as classTransformer from 'class-transformer';
 import * as classValidator from 'class-validator';
+import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentConfig, AgentConfig, dmrServerConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
-import { AgentsService } from './agents.service';
+import { MessagesService } from './messages.service';
 import { BadRequestException, GatewayTimeoutException } from '@nestjs/common';
 
 describe('AgentsService', () => {
-  let service: AgentsService;
+  let service: MessagesService;
   let websocketService: WebsocketService;
   let cacheManager: Cache;
   let agentConfigMock: AgentConfig;
+  let httpService: HttpService;
 
   const agent1: IAgent = {
     id: '1',
@@ -48,16 +51,9 @@ describe('AgentsService', () => {
   };
 
   beforeEach(async () => {
-    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
-      'mock-uuid' as unknown as ReturnType<typeof crypto.randomUUID>,
-    );
-
-    vi.spyOn(classTransformer, 'plainToInstance').mockImplementation((_, obj) => obj as any);
-    vi.spyOn(classValidator, 'validate').mockResolvedValue([]);
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AgentsService,
+        MessagesService,
         {
           provide: agentConfig.KEY,
           useValue: {
@@ -68,7 +64,7 @@ describe('AgentsService', () => {
         {
           provide: dmrServerConfig.KEY,
           useValue: {
-            ackTimeoutMs: 10, // small timeout for fast failure in tests
+            ackTimeoutMs: 10,
           },
         },
         {
@@ -82,13 +78,20 @@ describe('AgentsService', () => {
             getSocket: vi.fn(),
           },
         },
+        {
+          provide: HttpService,
+          useValue: {
+            post: vi.fn().mockReturnValue(of({ data: {} })),
+          },
+        },
       ],
     }).compile();
 
-    service = module.get(AgentsService);
+    service = module.get(MessagesService);
     websocketService = module.get(WebsocketService);
     cacheManager = module.get(CACHE_MANAGER);
     agentConfigMock = module.get(agentConfig.KEY);
+    httpService = module.get(HttpService);
 
     vi.spyOn(classTransformer, 'plainToInstance').mockImplementation((_, obj) => obj as any);
     vi.spyOn(classValidator, 'validate').mockResolvedValue([]);
@@ -169,16 +172,16 @@ describe('AgentsService', () => {
       vi.spyOn(Utils, 'encryptPayload').mockResolvedValueOnce(encryptedPayload);
 
       const message = {
+        id: 'test-message-id',
         payload: ['some-data'],
         recipientId: mockRecipient.id,
-        id: 'id',
       };
 
       const result = await service.encryptMessagePayloadFromExternalService(message);
 
       expect(result).toEqual(
         expect.objectContaining({
-          id: 'mock-uuid',
+          id: expect.any(String),
           type: MessageType.ChatMessage,
           payload: encryptedPayload,
           recipientId: mockRecipient.id,
@@ -192,9 +195,9 @@ describe('AgentsService', () => {
       vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(null);
 
       const result = await service.encryptMessagePayloadFromExternalService({
+        id: 'test-message-id',
         payload: ['data'],
         recipientId: 'invalid',
-        id: 'id',
       });
 
       expect(result).toBeNull();
@@ -210,9 +213,9 @@ describe('AgentsService', () => {
       vi.spyOn(Utils, 'encryptPayload').mockRejectedValueOnce(new Error('Test Error'));
 
       const result = await service.encryptMessagePayloadFromExternalService({
+        id: 'test-message-id',
         payload: ['data'],
         recipientId: 'recipient-id',
-        id: 'id',
       });
 
       expect(result).toBeNull();

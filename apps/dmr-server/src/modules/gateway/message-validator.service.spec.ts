@@ -113,7 +113,7 @@ describe('MessageValidatorService', () => {
         senderId: '123e4567-e89b-12d3-a456-426614174001',
         recipientId: '123e4567-e89b-12d3-a456-426614174002',
         timestamp: new Date().toISOString(),
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: 'test payload',
       };
 
@@ -148,7 +148,7 @@ describe('MessageValidatorService', () => {
         senderId: '123e4567-e89b-12d3-a456-426614174001',
         recipientId: '123e4567-e89b-12d3-a456-426614174002',
         timestamp: new Date().toISOString(),
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: JSON.stringify({ content: 'nested content', values: [1, 2, 3] }),
       };
 
@@ -182,7 +182,7 @@ describe('MessageValidatorService', () => {
         senderId: '123e4567-e89b-12d3-a456-426614174001',
         recipientId: '123e4567-e89b-12d3-a456-426614174002',
         timestamp: new Date().toISOString(),
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: 'test payload',
         extraField: 'should be preserved',
       };
@@ -205,7 +205,7 @@ describe('MessageValidatorService', () => {
         senderId: '123e4567-e89b-12d3-a456-426614174099',
         recipientId: '123e4567-e89b-12d3-a456-426614174002',
         timestamp: new Date().toISOString(),
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: 'test payload',
       };
 
@@ -218,7 +218,7 @@ describe('MessageValidatorService', () => {
         senderId: '123e4567-e89b-12d3-a456-426614174001',
         recipientId: '123e4567-e89b-12d3-a456-426614174099',
         timestamp: new Date().toISOString(),
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: 'test payload',
       };
 
@@ -231,7 +231,7 @@ describe('MessageValidatorService', () => {
         senderId: '123e4567-e89b-12d3-a456-426614174001',
         recipientId: '123e4567-e89b-12d3-a456-426614174002',
         timestamp: 'invalid-timestamp',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: 'test payload',
       };
 

@@ -1,12 +1,10 @@
 import {
-  ConnectedSocket,
-  MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer,
-} from '@nestjs/websockets';
+  AgentEventNames,
+  AgentMessageDto,
+  DmrServerEvent,
+  SimpleValidationFailureMessage,
+  ValidationErrorDto,
+} from '@dmr/shared';
 import {
   BadRequestException,
   forwardRef,
@@ -15,25 +13,24 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { Server, Socket } from 'socket.io';
-import { AuthService } from '../auth/auth.service';
-import { RabbitMQService } from '../../libs/rabbitmq';
-import { CentOpsService } from '../centops/centops.service';
-import {
-  AgentEncryptedMessageDto,
-  AgentEventNames,
-  AgentMessageDto,
-  DmrServerEvent,
-  SimpleValidationFailureMessage,
-  SocketAckResponse,
-  SocketActEnum,
-  ValidationErrorDto,
-} from '@dmr/shared';
 import { OnEvent } from '@nestjs/event-emitter';
+import {
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { MetricService } from '../../libs/metrics';
+import { RabbitMQService } from '../../libs/rabbitmq';
+import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
+import { AuthService } from '../auth/auth.service';
+import { CentOpsService } from '../centops/centops.service';
 import { CentOpsConfigurationDifference } from '../centops/interfaces/cent-ops-configuration-difference.interface';
 import { MessageValidatorService } from './message-validator.service';
-import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
-import { MetricService } from '../../libs/metrics';
 
 @WebSocketGateway({
   namespace: '/v1/dmr-agent-events',
@@ -187,31 +184,23 @@ export class AgentGateway
   }
 
   @SubscribeMessage(AgentEventNames.MESSAGE_TO_DMR_SERVER)
-  handleMessageFromDMRAgent(
+  async handleMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() message: AgentEncryptedMessageDto,
-  ): SocketAckResponse {
-    const agentId = client?.agent?.sub;
+    @MessageBody() data: unknown,
+  ): Promise<void> {
+    const receivedAt = new Date().toISOString();
+    const end = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+      event: AgentEventNames.MESSAGE_TO_DMR_SERVER,
+    });
 
     try {
-      if (!agentId) {
-        this.logger.error(`Client not authenticated: ${client.id}`);
-        return { status: SocketActEnum.ERROR, error: 'Unauthorized client' };
-      }
-
-      const queueName = agentId;
-
-      this.rabbitService.channel.sendToQueue(queueName, Buffer.from(JSON.stringify(message)), {
-        persistent: true,
-      });
-
-      this.logger.log(`Message from agent ${agentId} forwarded to queue: ${queueName}`);
-      return { status: SocketActEnum.OK };
+      const result = await this.messageValidator.validateMessage(data, receivedAt);
+      await this.handleValidMessage(result, receivedAt);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.error(`Error processing message from ${agentId}: ${message}`);
-      return { status: SocketActEnum.ERROR, error: message };
+      await this.handleMessageError(error);
     }
+
+    end();
   }
 
   @SubscribeMessage(AgentEventNames.MESSAGE_PROCESSING_FAILED)
@@ -265,10 +254,5 @@ export class AgentGateway
         `Unexpected error processing message: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
-  }
-
-  @SubscribeMessage('messageToDMR')
-  handleMessage(@ConnectedSocket() client: Socket, @MessageBody() data: string): void {
-    this.logger.log(`${client.id} sent message to DMR: ${data}`);
   }
 }

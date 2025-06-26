@@ -79,6 +79,7 @@ services:
       - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
       - AGENT_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAzswOj9MYib7AdrZ4Xc5Eoz/wS6RwHaN1YxZq+rF9c8o2NCtp\nYs3DLOia8UdS3CQXyPjBfJlQbCiJpP8/FTd3SYRlkU0=\n-----END RSA PRIVATE KEY-----
       - AGENT_ID=cc5b7b04-ba33-4423-ba26-ccc25441db42
+      - OUTGOING_MESSAGE_ENDPOINT=http://localhost:3001/api/messages
     networks:
       - bykstack
 
@@ -102,6 +103,7 @@ services:
       - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
       - AGENT_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAzswOj9MYib7AdrZ4Xc5Eoz/wS6RwHaN1YxZq+rF9c8o2NCtp\nYs3DLOia8UdS3CQXyPjBfJlQbCiJpP8/FTd3SYRlkU0=\n-----END RSA PRIVATE KEY-----
       - AGENT_ID=dd6c8b15-cb44-5534-cb37-ddd36552ec53
+      - OUTGOING_MESSAGE_ENDPOINT=http://localhost:3002/api/messages
     networks:
       - bykstack
 
