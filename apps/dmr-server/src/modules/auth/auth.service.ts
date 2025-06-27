@@ -64,6 +64,7 @@ export class AuthService {
       if (error instanceof Error) {
         this.logger.error('Error decoding JWT:', error.message);
       }
+
       return null;
     }
   }
