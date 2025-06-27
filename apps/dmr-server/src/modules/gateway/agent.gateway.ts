@@ -2,9 +2,9 @@ import {
   AgentEventNames,
   AgentMessageDto,
   DmrServerEvent,
-  SimpleValidationFailureMessage,
   SocketAckResponse,
   SocketAckStatus,
+  ISocketAckPayload,
   ValidationErrorDto,
 } from '@dmr/shared';
 import {
@@ -86,7 +86,7 @@ export class AgentGateway
     const emit = (event: string, ...arguments_: unknown[]) => {
       this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
 
-      return this.server.emit(event, ...arguments_);
+      return Server.prototype.emit.call(this.server, event, ...arguments_) as boolean;
     };
 
     this.server.emit = emit;
@@ -160,18 +160,37 @@ export class AgentGateway
     this.logger.log('Agent configurations updated and emitted to all connected clients');
   }
 
-  public forwardMessageToAgent(agentId: string, message: AgentMessageDto): void {
+  public async forwardMessageToAgent(
+    agentId: string,
+    message: AgentMessageDto,
+  ): Promise<ISocketAckPayload | null> {
     try {
       const socket = this.findSocketByAgentId(agentId);
       if (!socket) {
         this.logger.warn(`No connected socket found for agent ${agentId}`);
         return;
       }
-      socket.emit(AgentEventNames.MESSAGE_FROM_DMR_SERVER, message);
+
+      const response = (await socket.emitWithAck(
+        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+        message,
+      )) as ISocketAckPayload;
+
+      if (response.status === SocketAckStatus.ERROR) {
+        await this.rabbitMQMessageService.sendValidationFailure(
+          message,
+          response.errors,
+          message.receivedAt ?? new Date().toISOString(),
+        );
+      }
+
       this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
+      return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error forwarding RabbitMQ message to agent: ${errorMessage}`);
+
+      return null;
     }
   }
 
@@ -211,18 +230,6 @@ export class AgentGateway
 
     end();
     return socketAckResponse;
-  }
-
-  @SubscribeMessage(AgentEventNames.MESSAGE_PROCESSING_FAILED)
-  async handleError(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: SimpleValidationFailureMessage,
-  ) {
-    await this.rabbitMQMessageService.sendValidationFailure(
-      data.message,
-      data.errors,
-      data.receivedAt,
-    );
   }
 
   private async handleValidMessage(

@@ -103,6 +103,7 @@ describe('AgentGateway', () => {
       disconnect: vi.fn(),
       agent: agentPayload || undefined,
       emit: vi.fn(),
+      emitWithAck: vi.fn(),
       on: vi.fn(),
       onAny: vi.fn(),
       onAnyOutgoing: vi.fn(),
@@ -484,7 +485,7 @@ describe('AgentGateway', () => {
 
       gateway.forwardMessageToAgent('agent-123', testMessage);
 
-      expect(mockSocket1.emit).toHaveBeenCalledWith(
+      expect(mockSocket1.emitWithAck).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
         testMessage,
       );
@@ -517,7 +518,7 @@ describe('AgentGateway', () => {
     it('should handle errors during message forwarding', () => {
       // Setup mock socket that throws on emit
       const mockSocket = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
-      (mockSocket.emit as any).mockImplementation(() => {
+      (mockSocket.emitWithAck as any).mockImplementation(() => {
         throw new Error('Socket error');
       });
 

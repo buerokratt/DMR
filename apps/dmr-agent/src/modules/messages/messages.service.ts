@@ -12,8 +12,7 @@ import {
   SocketAckResponse,
   SocketAckStatus,
   Utils,
-  SimpleValidationFailureMessage,
-  ValidationErrorDto,
+  ISocketAckCallback,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -74,9 +73,12 @@ export class MessagesService implements OnModuleInit {
       void this.handlePartialAgentListEvent(data);
     });
 
-    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentMessageDto) => {
-      void this.handleMessageFromDMRServerEvent(data);
-    });
+    socket.on(
+      AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+      (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+        void this.handleMessageFromDMRServerEvent(data, ackCb);
+      },
+    );
   }
 
   private async handleFullAgentListEvent(data: IAgentList): Promise<void> {
@@ -143,52 +145,53 @@ export class MessagesService implements OnModuleInit {
     }
   }
 
-  private async handleMessageFromDMRServerEvent(message: AgentMessageDto): Promise<void> {
-    const errors: ValidationErrorDto[] = [];
-
+  private async handleMessageFromDMRServerEvent(
+    message: AgentMessageDto,
+    ackCb: ISocketAckCallback,
+  ): Promise<void> {
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
       if (!decryptedMessage) {
         this.logger.error('Failed to decrypt message from DMR Server');
-        errors.push({
-          type: ValidationErrorType.DECRYPTION_FAILED,
-          message: 'Failed to decrypt message from DMR Server',
+
+        return ackCb({
+          status: SocketAckStatus.ERROR,
+          errors: [
+            {
+              type: ValidationErrorType.DECRYPTION_FAILED,
+              message: 'Failed to decrypt message from DMR Server',
+            },
+          ],
         });
-      } else {
-        const outgoingMessage: ExternalServiceMessageDto = {
-          id: message.id,
-          recipientId: message.recipientId,
-          payload: decryptedMessage.payload,
-        };
-
-        await this.handleOutgoingMessage(outgoingMessage);
-
-        this.logger.log(`Successfully processed and forwarded message ${message.id}`);
       }
+
+      const outgoingMessage: ExternalServiceMessageDto = {
+        id: message.id,
+        recipientId: message.recipientId,
+        payload: decryptedMessage.payload,
+      };
+
+      await this.handleOutgoingMessage(outgoingMessage);
+
+      this.logger.log(`Successfully processed and forwarded message ${message.id}`);
+
+      this.logger.log('Message is decrypted');
+
+      return ackCb({ status: SocketAckStatus.OK });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
 
-      errors.push({
-        type: ValidationErrorType.DECRYPTION_FAILED,
-        message: errorMessage,
+      return ackCb({
+        status: SocketAckStatus.ERROR,
+        errors: [
+          {
+            type: ValidationErrorType.DECRYPTION_FAILED,
+            message: errorMessage,
+          },
+        ],
       });
-    }
-
-    if (errors.length !== 0) {
-      const error: SimpleValidationFailureMessage = {
-        id: message.id,
-        errors: errors,
-        message: message,
-        receivedAt: message.receivedAt || new Date().toISOString(),
-      };
-
-      this.websocketService.getSocket()?.emit(AgentEventNames.MESSAGE_PROCESSING_FAILED, error);
-
-      this.logger.warn(
-        `Emitted ${AgentEventNames.MESSAGE_PROCESSING_FAILED} event for message ${message.id} with errors: ${JSON.stringify(errors)}`,
-      );
     }
   }
 
@@ -334,7 +337,7 @@ export class MessagesService implements OnModuleInit {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
 
       this.logger.error(`Error decrypting message: ${errorMessage}`);
-      throw new BadRequestException(errorMessage);
+      return null;
     }
   }
 }

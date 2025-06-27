@@ -287,7 +287,7 @@ describe('AgentsService', () => {
   });
 
   describe('handleMessageFromDMRServerEvent', () => {
-    it('should emit MESSAGE_PROCESSING_FAILED if decryption fails', async () => {
+    it('should return error if decryption fails', async () => {
       const mockSender = {
         id: 'sender-id',
         authenticationCertificate: 'mock-cert',
@@ -301,6 +301,7 @@ describe('AgentsService', () => {
         recipientId: agentConfigMock.id,
         timestamp: new Date().toISOString(),
       };
+      const ackCbSpy = vi.fn();
 
       const emitSpy = vi.fn();
 
@@ -310,11 +311,11 @@ describe('AgentsService', () => {
 
       vi.spyOn(service as any, 'decryptMessagePayloadFromDMRServer').mockResolvedValueOnce(null);
 
-      await (service as any).handleMessageFromDMRServerEvent(message);
+      await (service as any).handleMessageFromDMRServerEvent(message, ackCbSpy);
 
-      expect(emitSpy).toHaveBeenCalledWith(
-        AgentEventNames.MESSAGE_PROCESSING_FAILED,
+      expect(ackCbSpy).toHaveBeenCalledWith(
         expect.objectContaining({
+          status: SocketAckStatus.ERROR,
           errors: expect.arrayContaining([
             expect.objectContaining({
               type: ValidationErrorType.DECRYPTION_FAILED,
