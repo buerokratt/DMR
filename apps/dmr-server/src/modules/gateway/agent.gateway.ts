@@ -2,9 +2,9 @@ import {
   AgentEventNames,
   AgentMessageDto,
   DmrServerEvent,
+  ISocketAckPayload,
   SocketAckResponse,
   SocketAckStatus,
-  ISocketAckPayload,
   ValidationErrorDto,
 } from '@dmr/shared';
 import {
@@ -63,8 +63,6 @@ export class AgentGateway
 
   onModuleInit() {
     this.handleConnectionEvent = (socket: Socket) => {
-      const namespace = socket.nsp.name;
-
       socket.onAny((event: string) => {
         if (event === 'error') {
           this.metricService.errorsTotalCounter.inc(1);
@@ -72,19 +70,22 @@ export class AgentGateway
 
         const ignored = ['ping', 'disconnect', 'connect', 'error'];
         if (!ignored.includes(event)) {
-          this.metricService.eventsReceivedTotalCounter.inc({ event, namespace });
+          this.metricService.eventsReceivedTotalCounter.inc({
+            event,
+            namespace: this.server.of.name,
+          });
         }
       });
 
       socket.onAnyOutgoing((event: string) => {
-        this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
       });
     };
 
     this.server.on('connection', this.handleConnectionEvent);
 
     const emit = (event: string, ...arguments_: unknown[]) => {
-      this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
+      this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
 
       return Server.prototype.emit.call(this.server, event, ...arguments_) as boolean;
     };
