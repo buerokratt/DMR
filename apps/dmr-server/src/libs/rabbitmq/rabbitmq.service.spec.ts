@@ -419,7 +419,6 @@ describe('RabbitMQService', () => {
         capturedCallback!(mockMessage);
 
         expect(forwardSpy).toHaveBeenCalledWith(queueName, mockMessage);
-        // expect(ackMock).toHaveBeenCalledWith(mockMessage);
       });
 
       it('should handle errors and nack messages when processing fails', async () => {

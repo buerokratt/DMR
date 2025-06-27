@@ -7,7 +7,7 @@ import {
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
-  ISocketActCallback,
+  ISocketAckCallback,
   MessageType,
   SocketAckStatus,
   Utils,
@@ -66,7 +66,7 @@ export class MessagesService implements OnModuleInit {
 
     socket.on(
       AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-      (data: AgentEncryptedMessageDto, ackCb: ISocketActCallback) => {
+      (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
         void this.handleMessageFromDMRServerEvent(data, ackCb);
       },
     );
@@ -138,7 +138,7 @@ export class MessagesService implements OnModuleInit {
 
   private async handleMessageFromDMRServerEvent(
     message: AgentMessageDto,
-    ackCb: ISocketActCallback,
+    ackCb: ISocketAckCallback,
   ): Promise<void> {
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
