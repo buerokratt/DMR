@@ -17,6 +17,8 @@ export class AuthService {
     const clientId = this.getKidFromToken(token);
 
     if (!clientId) {
+      this.logger.error('Token kid is missing or invalid');
+
       throw new BadRequestException('Token kid is missing or invalid');
     }
 
@@ -36,7 +38,7 @@ export class AuthService {
     }
 
     if (verifiedToken.sub !== clientId) {
-      this.logger.error('Token sub and kid do not match');
+      this.logger.error(`Token sub: ${verifiedToken.sub} and kid: ${clientId} do not match`);
 
       throw new BadRequestException('Token sub and kid do not match');
     }
