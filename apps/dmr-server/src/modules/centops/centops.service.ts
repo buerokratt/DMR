@@ -1,9 +1,3 @@
-import {
-  AgentDto,
-  ClientConfigDto,
-  DmrServerEvent,
-  IGetAgentConfigListResponse,
-} from '@dmr/shared';
 import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
@@ -14,15 +8,21 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CronJob } from 'cron';
 import { firstValueFrom } from 'rxjs';
+import {
+  AgentDto,
+  DmrServerEvent,
+  ClientConfigDto,
+  IGetAgentConfigListResponse,
+} from '@dmr/shared';
+import { CronJob } from 'cron';
 import { CentOpsConfig, centOpsConfig } from '../../common/config';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { CentOpsConfigurationDifference } from './interfaces/cent-ops-configuration-difference.interface';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class CentOpsService implements OnModuleInit {

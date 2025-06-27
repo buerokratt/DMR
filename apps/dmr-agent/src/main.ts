@@ -1,4 +1,4 @@
-import { ConsoleLogger, LogLevel, ValidationPipe } from '@nestjs/common';
+import { ConsoleLogger, LogLevel, VersioningType, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -8,7 +8,7 @@ import { APP_CONFIG_TOKEN, AppConfig, GlobalConfig } from './common/config';
 
 async function bootstrap(): Promise<void> {
   const logger = new ConsoleLogger({
-    logLevels: (process.env.LOGGER_LOG_LEVELS?.split(',') as LogLevel[]) || [
+    logLevels: (process.env.LOGGER_LOG_LEVELS?.split(' ') as LogLevel[]) || [
       'error',
       'warn',
       'log',
@@ -25,6 +25,9 @@ async function bootstrap(): Promise<void> {
 
   const configService = app.get<ConfigService<GlobalConfig>>(ConfigService);
   const appConfig = configService.getOrThrow<AppConfig>(APP_CONFIG_TOKEN);
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
   app.use(compression());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
 

@@ -1,4 +1,3 @@
-import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Server, Socket } from 'socket.io';
@@ -6,9 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
-import { AuthService } from '../auth/auth.service';
 import { CentOpsService } from '../centops/centops.service';
 import { AgentGateway } from './agent.gateway';
+import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
+import { AuthService } from '../auth/auth.service';
 import { MessageValidatorService } from './message-validator.service';
 
 declare module 'socket.io' {
@@ -466,7 +466,7 @@ describe('AgentGateway', () => {
         timestamp: '2025-06-18T14:00:00Z',
         senderId: 'server-id',
         recipientId: 'agent-123',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: '{"key":"value"}',
       };
 
@@ -489,7 +489,7 @@ describe('AgentGateway', () => {
         timestamp: '2025-06-18T14:00:00Z',
         senderId: 'server-id',
         recipientId: 'agent-789',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: '{"key":"value"}',
       };
 
@@ -516,7 +516,7 @@ describe('AgentGateway', () => {
         timestamp: '2025-06-18T14:00:00Z',
         senderId: 'server-id',
         recipientId: 'agent-123',
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: '{"key":"value"}',
       };
 
