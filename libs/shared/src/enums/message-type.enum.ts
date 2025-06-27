@@ -1,3 +1,3 @@
 export enum MessageType {
-  Message = 'Message',
+  ChatMessage = 'ChatMessage',
 }

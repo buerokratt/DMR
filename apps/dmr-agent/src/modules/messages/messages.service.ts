@@ -11,7 +11,6 @@ import {
   MessageType,
   SocketAckStatus,
   Utils,
-  ValidationErrorDto,
   ValidationErrorType,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
@@ -25,9 +24,9 @@ import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
-export class AgentsService implements OnModuleInit {
+export class MessagesService implements OnModuleInit {
   private readonly AGENTS_CACHE_KEY = 'DMR_AGENTS_LIST';
-  private readonly logger = new Logger(AgentsService.name);
+  private readonly logger = new Logger(MessagesService.name);
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
@@ -141,28 +140,32 @@ export class AgentsService implements OnModuleInit {
     message: AgentMessageDto,
     ackCb: ISocketActCallback,
   ): Promise<void> {
-    const errors: ValidationErrorDto[] = [];
-
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
       if (!decryptedMessage) {
         this.logger.error('Failed to decrypt message from DMR Server');
-        errors.push({
-          type: ValidationErrorType.DECRYPTION_FAILED,
-          message: 'Failed to decrypt message from DMR Server',
+
+        return ackCb({
+          status: SocketAckStatus.ERROR,
+          errors: [
+            {
+              type: ValidationErrorType.DECRYPTION_FAILED,
+              message: 'Failed to decrypt message from DMR Server',
+            },
+          ],
         });
-      } else {
-        const outgoingMessage: ExternalServiceMessageDto = {
-          id: message.id,
-          recipientId: message.recipientId,
-          payload: decryptedMessage.payload,
-        };
-
-        await this.handleOutgoingMessage(outgoingMessage);
-
-        this.logger.log(`Successfully processed and forwarded message ${message.id}`);
       }
+
+      const outgoingMessage: ExternalServiceMessageDto = {
+        id: message.id,
+        recipientId: message.recipientId,
+        payload: decryptedMessage.payload,
+      };
+
+      await this.handleOutgoingMessage(outgoingMessage);
+
+      this.logger.log(`Successfully processed and forwarded message ${message.id}`);
 
       this.logger.log('Message is decrypted');
 
@@ -171,14 +174,15 @@ export class AgentsService implements OnModuleInit {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
 
-      errors.push({
-        type: ValidationErrorType.DECRYPTION_FAILED,
-        message: errorMessage,
+      return ackCb({
+        status: SocketAckStatus.ERROR,
+        errors: [
+          {
+            type: ValidationErrorType.DECRYPTION_FAILED,
+            message: errorMessage,
+          },
+        ],
       });
-    }
-
-    if (errors.length !== 0) {
-      return ackCb({ status: SocketAckStatus.ERROR, errors });
     }
   }
 
@@ -207,6 +211,17 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
+  async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
+    const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
+
+    if (!encryptedMessage) {
+      this.logger.error('Message not encrypted');
+      throw new Error('Message not encrypted');
+    }
+
+    this.logger.log(`Message encrypted successfully`);
+  }
+
   async encryptMessagePayloadFromExternalService(
     message: ExternalServiceMessageDto,
   ): Promise<AgentEncryptedMessageDto | null> {
@@ -227,7 +242,7 @@ export class AgentsService implements OnModuleInit {
 
       const encryptedMessage: AgentEncryptedMessageDto = {
         id: uuid,
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: encryptedPayload,
         recipientId: recipient.id,
         senderId: this.agentConfig.id,
