@@ -12,7 +12,7 @@ import {
   AgentEventNames,
   JwtPayload,
   MessageType,
-  SocketActEnum,
+  SocketAckStatus,
 } from '@dmr/shared';
 import { AuthService } from '../auth/auth.service';
 import { MessageValidatorService } from './message-validator.service';
@@ -620,7 +620,7 @@ describe('AgentGateway', () => {
         mockValidatedMessage.message,
         expect.any(String),
       );
-      expect(result).toEqual({ status: SocketActEnum.OK });
+      expect(result).toEqual({ status: SocketAckStatus.OK });
       expect(loggerSpy).toHaveBeenCalledWith(
         `Received valid message from agent ${mockValidatedMessage.message.senderId} to ${mockValidatedMessage.message.recipientId} (ID: ${mockValidatedMessage.message.id})`,
       );
@@ -650,7 +650,7 @@ describe('AgentGateway', () => {
         validationErrors,
         expect.any(String),
       );
-      expect(result).toEqual({ status: SocketActEnum.ERROR, error: 'Invalid message' });
+      expect(result).toEqual({ status: SocketAckStatus.ERROR, error: 'Invalid message' });
       expect(loggerWarnSpy).toHaveBeenCalledWith(`Invalid message received: Invalid message`);
       expect(mockHistogram.startTimer).toHaveBeenCalled();
     });
@@ -666,7 +666,7 @@ describe('AgentGateway', () => {
         expect.any(String),
       );
       expect(mockRabbitMQMessageService.sendValidationFailure).not.toHaveBeenCalled();
-      expect(result).toEqual({ status: SocketActEnum.ERROR, error: 'Something went wrong' });
+      expect(result).toEqual({ status: SocketAckStatus.ERROR, error: 'Something went wrong' });
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         `Unexpected error processing message: Something went wrong`,
       );
@@ -683,7 +683,10 @@ describe('AgentGateway', () => {
         expect.any(String),
       );
       expect(mockRabbitMQMessageService.sendValidationFailure).not.toHaveBeenCalled();
-      expect(result).toEqual({ status: SocketActEnum.ERROR, error: '"Validation failed string"' });
+      expect(result).toEqual({
+        status: SocketAckStatus.ERROR,
+        error: '"Validation failed string"',
+      });
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         `Unexpected error processing message: Unknown error`,
       );
@@ -696,7 +699,7 @@ describe('AgentGateway', () => {
       const result = await gateway.handleMessage(mockClient, message);
 
       expect(result).toEqual({
-        status: SocketActEnum.ERROR,
+        status: SocketAckStatus.ERROR,
         error: 'Validation succeeded but no message was returned',
       });
       expect(mockRabbitMQMessageService.sendValidMessage).not.toHaveBeenCalled();

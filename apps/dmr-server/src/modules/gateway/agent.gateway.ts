@@ -4,7 +4,7 @@ import {
   DmrServerEvent,
   SimpleValidationFailureMessage,
   SocketAckResponse,
-  SocketActEnum,
+  SocketAckStatus,
   ValidationErrorDto,
 } from '@dmr/shared';
 import {
@@ -199,12 +199,12 @@ export class AgentGateway
     try {
       const result = await this.messageValidator.validateMessage(data, receivedAt);
       await this.handleValidMessage(result, receivedAt);
-      socketAckResponse = { status: SocketActEnum.OK };
+      socketAckResponse = { status: SocketAckStatus.OK };
     } catch (error: unknown) {
       await this.handleMessageError(error);
 
       socketAckResponse = {
-        status: SocketActEnum.ERROR,
+        status: SocketAckStatus.ERROR,
         error: error instanceof Error ? error.message : JSON.stringify(error),
       };
     }
