@@ -10,7 +10,7 @@ import {
   IAgentList,
   MessageType,
   SocketAckResponse,
-  SocketActEnum,
+  SocketAckStatus,
   Utils,
   SimpleValidationFailureMessage,
   ValidationErrorDto,
@@ -29,7 +29,7 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
-import { AgentConfig, DMRServerConfig, agentConfig, dmrServerConfig } from '../../common/config';
+import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 import { firstValueFrom } from 'rxjs';
 
@@ -40,7 +40,6 @@ export class MessagesService implements OnModuleInit {
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
-    @Inject(dmrServerConfig.KEY) private readonly dmrServerConfig: DMRServerConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly websocketService: WebsocketService,
     private readonly httpService: HttpService,
@@ -245,11 +244,12 @@ export class MessagesService implements OnModuleInit {
     }
 
     try {
-      const ack = (await socket
-        .timeout(this.dmrServerConfig.ackTimeoutMs)
-        .emitWithAck(AgentEventNames.MESSAGE_TO_DMR_SERVER, encryptedMessage)) as SocketAckResponse;
+      const ack = (await socket.emitWithAck(
+        AgentEventNames.MESSAGE_TO_DMR_SERVER,
+        encryptedMessage,
+      )) as SocketAckResponse;
 
-      if (ack.status === SocketActEnum.ERROR) {
+      if (ack.status === SocketAckStatus.ERROR) {
         this.logger.error(ack.error);
         throw new BadRequestException(ack.error);
       }

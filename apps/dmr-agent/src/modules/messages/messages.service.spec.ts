@@ -4,7 +4,7 @@ import {
   IAgent,
   IAgentList,
   MessageType,
-  SocketActEnum,
+  SocketAckStatus,
   Utils,
   ValidationErrorType,
 } from '@dmr/shared';
@@ -15,7 +15,7 @@ import * as classTransformer from 'class-transformer';
 import * as classValidator from 'class-validator';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { agentConfig, AgentConfig, dmrServerConfig } from '../../common/config';
+import { agentConfig, AgentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
 import { MessagesService } from './messages.service';
 import { BadGatewayException, BadRequestException, GatewayTimeoutException } from '@nestjs/common';
@@ -61,12 +61,6 @@ describe('AgentsService', () => {
           useValue: {
             id: 'test-agent',
             privateKey: 'test-private-key',
-          },
-        },
-        {
-          provide: dmrServerConfig.KEY,
-          useValue: {
-            ackTimeoutMs: 10,
           },
         },
         {
@@ -367,7 +361,7 @@ describe('AgentsService', () => {
       websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
 
       mockSocket.emitWithAck.mockResolvedValue({
-        status: SocketActEnum.OK,
+        status: SocketAckStatus.OK,
       });
 
       await service.sendEncryptedMessageToServer(mockMessage);
@@ -375,7 +369,6 @@ describe('AgentsService', () => {
       expect(service.encryptMessagePayloadFromExternalService).toHaveBeenCalledWith(mockMessage);
       expect(websocketService.isConnected).toHaveBeenCalled();
       expect(websocketService.getSocket).toHaveBeenCalled();
-      expect(mockSocket.timeout).toHaveBeenCalledWith(10);
       expect(mockSocket.emitWithAck).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_TO_DMR_SERVER,
         mockEncryptedMessage,
@@ -519,24 +512,6 @@ describe('AgentsService', () => {
       }
     });
 
-    it('should use correct timeout from configuration', async () => {
-      vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
-        mockEncryptedMessage,
-      );
-
-      websocketService.isConnected = vi.fn().mockReturnValue(true);
-      websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
-
-      const customTimeout = 5000;
-      (service as any).dmrServerConfig.ackTimeoutMs = customTimeout;
-
-      mockSocket.emitWithAck.mockResolvedValue({ status: SocketActEnum.OK });
-
-      await service.sendEncryptedMessageToServer(mockMessage);
-
-      expect(mockSocket.timeout).toHaveBeenCalledWith(customTimeout);
-    });
-
     it('should handle successful response with additional data', async () => {
       vi.spyOn(service as any, 'encryptMessagePayloadFromExternalService').mockResolvedValue(
         mockEncryptedMessage,
@@ -546,7 +521,7 @@ describe('AgentsService', () => {
       websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
 
       const successResponse = {
-        status: SocketActEnum.OK,
+        status: SocketAckStatus.OK,
         messageId: 'server-message-id',
         timestamp: '2025-06-26T10:00:00.000Z',
       };
@@ -575,7 +550,7 @@ describe('AgentsService', () => {
       websocketService.isConnected = vi.fn().mockReturnValue(true);
       websocketService.getSocket = vi.fn().mockReturnValue(mockSocket);
 
-      mockSocket.emitWithAck.mockResolvedValue({ status: SocketActEnum.OK });
+      mockSocket.emitWithAck.mockResolvedValue({ status: SocketAckStatus.OK });
 
       await service.sendEncryptedMessageToServer(complexMessage);
 
