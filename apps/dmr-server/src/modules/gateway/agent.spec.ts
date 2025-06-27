@@ -1,3 +1,4 @@
+import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Server, Socket } from 'socket.io';
@@ -5,10 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
+import { AuthService } from '../auth/auth.service';
 import { CentOpsService } from '../centops/centops.service';
 import { AgentGateway } from './agent.gateway';
-import { AgentEventNames, JwtPayload, MessageType } from '@dmr/shared';
-import { AuthService } from '../auth/auth.service';
 import { MessageValidatorService } from './message-validator.service';
 
 declare module 'socket.io' {
@@ -524,10 +524,6 @@ describe('AgentGateway', () => {
       const errorSpy = vi.spyOn(gateway['logger'], 'error');
 
       gateway.forwardMessageToAgent('agent-123', testMessage);
-
-      // expect(errorSpy).toHaveBeenCalledWith(
-      //   expect.stringContaining('Error forwarding RabbitMQ message to agent: Socket error'),
-      // );
     });
   });
 
