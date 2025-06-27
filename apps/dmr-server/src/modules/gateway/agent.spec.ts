@@ -506,7 +506,7 @@ describe('AgentGateway', () => {
     it('should handle errors during message forwarding', () => {
       // Setup mock socket that throws on emit
       const mockSocket = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
-      (mockSocket.emit as any).mockImplementation(() => {
+      (mockSocket.emitWithAck as any).mockImplementation(() => {
         throw new Error('Socket error');
       });
 
@@ -524,6 +524,10 @@ describe('AgentGateway', () => {
       const errorSpy = vi.spyOn(gateway['logger'], 'error');
 
       gateway.forwardMessageToAgent('agent-123', testMessage);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error forwarding RabbitMQ message to agent: Socket error'),
+      );
     });
   });
 
