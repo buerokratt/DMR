@@ -2,6 +2,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { configs } from './config';
+import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
 
 @Module({
   imports: [
@@ -20,5 +21,6 @@ import { configs } from './config';
       isGlobal: true,
     }),
   ],
+  providers: [TimeoutInterceptor],
 })
 export class CommonModule {}

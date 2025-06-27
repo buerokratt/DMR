@@ -139,7 +139,9 @@ describe('AuthService', () => {
       expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(testToken, {
         publicKey: mockPublicKey,
       });
-      expect(loggerSpy).toHaveBeenCalledWith('Token sub and kid do not match');
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Token sub: ${mismatchedPayload.sub} and kid: ${mockClientId} do not match`,
+      );
     });
   });
 

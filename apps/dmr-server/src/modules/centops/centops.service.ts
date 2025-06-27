@@ -2,11 +2,11 @@ import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
-  forwardRef,
   Inject,
   Injectable,
   Logger,
   OnModuleInit,
+  forwardRef,
 } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { plainToInstance } from 'class-transformer';
@@ -31,7 +31,6 @@ export class CentOpsService implements OnModuleInit {
   private readonly logger = new Logger(CentOpsService.name);
 
   constructor(
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @Inject(centOpsConfig.KEY)
     private readonly centOpsConfig: CentOpsConfig,
     private readonly httpService: HttpService,
@@ -39,6 +38,7 @@ export class CentOpsService implements OnModuleInit {
     private readonly rabbitMQService: RabbitMQService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly eventEmitter: EventEmitter2,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   onModuleInit(): void {
