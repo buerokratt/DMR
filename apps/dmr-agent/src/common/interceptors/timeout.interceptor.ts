@@ -3,8 +3,8 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
-  RequestTimeoutException,
   Inject,
+  GatewayTimeoutException,
 } from '@nestjs/common';
 import { throwError, TimeoutError } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
@@ -19,7 +19,7 @@ export class TimeoutInterceptor implements NestInterceptor {
       timeout(this.agentConfig.incomingMessageRequestTimeoutMs),
       catchError((error: unknown) => {
         if (error instanceof TimeoutError) {
-          return throwError(() => new RequestTimeoutException());
+          return throwError(() => new GatewayTimeoutException());
         }
         return throwError(() => error);
       }),
