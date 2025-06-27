@@ -82,14 +82,10 @@ export class AgentGateway
 
     this.server.on('connection', this.handleConnectionEvent);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const originalEmit = this.server.emit.bind(this.server);
-
     const emit = (event: string, ...arguments_: unknown[]) => {
       this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
-      return originalEmit(event, ...arguments_);
+      return Server.prototype.emit.call(this.server, event, ...arguments_) as boolean;
     };
 
     this.server.emit = emit;
