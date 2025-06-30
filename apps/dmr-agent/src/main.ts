@@ -1,4 +1,4 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConsoleLogger, LogLevel, VersioningType, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -7,21 +7,35 @@ import { AppModule } from './app.module';
 import { APP_CONFIG_TOKEN, AppConfig, GlobalConfig } from './common/config';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: true });
-  app.use(compression());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+  const logger = new ConsoleLogger({
+    logLevels: (process.env.LOGGER_LOG_LEVELS?.split(' ') as LogLevel[]) || [
+      'error',
+      'warn',
+      'log',
+    ],
+    timestamp: true,
+    colors: process.env.LOGGER_COLORS === 'true',
+  });
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    cors: true,
+    bufferLogs: true,
+    logger,
+  });
 
   const configService = app.get<ConfigService<GlobalConfig>>(ConfigService);
   const appConfig = configService.getOrThrow<AppConfig>(APP_CONFIG_TOKEN);
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
+  app.use(compression());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
 
   await app.listen(appConfig.port);
 
   if (appConfig.environment === 'development') {
-    const logger = new Logger('bootstrap');
     logger.log(`Listening on ${await app.getUrl()}`);
   }
-
-  Logger.log(`🚀 Application is running on: http://localhost:${appConfig.port}`);
 }
 
 void bootstrap();

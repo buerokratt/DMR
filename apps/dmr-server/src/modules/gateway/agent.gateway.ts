@@ -1,5 +1,20 @@
-import { AgentEventNames, AgentMessageDto, DmrServerEvent, ValidationErrorDto } from '@dmr/shared';
-import { BadRequestException, forwardRef, Inject, Logger } from '@nestjs/common';
+import {
+  AgentEventNames,
+  AgentMessageDto,
+  DmrServerEvent,
+  ISocketAckPayload,
+  SocketAckResponse,
+  SocketAckStatus,
+  ValidationErrorDto,
+} from '@dmr/shared';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -11,6 +26,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
 import { AuthService } from '../auth/auth.service';
@@ -25,11 +41,15 @@ import { MessageValidatorService } from './message-validator.service';
     skipMiddlewares: true,
   },
 })
-export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class AgentGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy
+{
   @WebSocketServer()
   server!: Server;
 
   private readonly logger = new Logger(AgentGateway.name);
+  private originalEmit: Server['emit'];
+  private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
     private readonly authService: AuthService,
@@ -39,7 +59,47 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @Inject(forwardRef(() => RabbitMQMessageService))
     private readonly rabbitMQMessageService: RabbitMQMessageService,
     private readonly centOpsService: CentOpsService,
+    private readonly metricService: MetricService,
   ) {}
+
+  onModuleInit() {
+    this.handleConnectionEvent = (socket: Socket) => {
+      socket.onAny((event: string) => {
+        if (event === 'error') {
+          this.metricService.errorsTotalCounter.inc(1);
+        }
+
+        const ignored = ['ping', 'disconnect', 'connect', 'error'];
+        if (!ignored.includes(event)) {
+          this.metricService.eventsReceivedTotalCounter.inc({
+            event,
+            namespace: this.server.of.name,
+          });
+        }
+      });
+
+      socket.onAnyOutgoing((event: string) => {
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
+      });
+    };
+
+    this.server.on('connection', this.handleConnectionEvent);
+
+    const emit = (event: string, ...arguments_: unknown[]) => {
+      this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
+
+      return Server.prototype.emit.call(this.server, event, ...arguments_) as boolean;
+    };
+
+    this.server.emit = emit;
+  }
+
+  onModuleDestroy() {
+    this.server.off('connection', this.handleConnectionEvent);
+    if (this.originalEmit) {
+      this.server.emit = this.originalEmit;
+    }
+  }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {
     try {
@@ -69,6 +129,9 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const centOpsConfigurations = await this.centOpsService.getCentOpsConfigurations();
       this.server.emit(AgentEventNames.FULL_AGENT_LIST, centOpsConfigurations);
+
+      this.metricService.activeConnectionGauge.inc(1);
+      this.metricService.connectionsTotalCounter.inc(1);
     } catch {
       this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
       client.disconnect();
@@ -76,10 +139,20 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleDisconnect(@ConnectedSocket() client: Socket): Promise<void> {
+    this.metricService.activeConnectionGauge.dec(1);
+    this.metricService.disconnectionsTotalCounter.inc(1);
+
     const agentId = client?.agent?.sub;
+    const connectedAt = client?.agent?.cat;
 
     if (agentId) {
       await this.rabbitService.unsubscribe(agentId);
+    }
+
+    if (connectedAt) {
+      const durationSeconds = (Date.now() - connectedAt) / 1000;
+
+      this.metricService.socketConnectionDurationSecondsHistogram.observe(durationSeconds);
     }
 
     this.logger.log(`Agent disconnected: ${agentId} (Socket ID: ${client.id})`);
@@ -92,18 +165,37 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log('Agent configurations updated and emitted to all connected clients');
   }
 
-  public forwardMessageToAgent(agentId: string, message: AgentMessageDto): void {
+  public async forwardMessageToAgent(
+    agentId: string,
+    message: AgentMessageDto,
+  ): Promise<ISocketAckPayload | null> {
     try {
       const socket = this.findSocketByAgentId(agentId);
       if (!socket) {
         this.logger.warn(`No connected socket found for agent ${agentId}`);
         return;
       }
-      socket.emit(AgentEventNames.MESSAGE_FROM_DMR_SERVER, message);
+
+      const response = (await socket.emitWithAck(
+        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+        message,
+      )) as ISocketAckPayload;
+
+      if (response.status === SocketAckStatus.ERROR) {
+        await this.rabbitMQMessageService.sendValidationFailure(
+          message,
+          response.errors,
+          message.receivedAt ?? new Date().toISOString(),
+        );
+      }
+
       this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
+      return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error forwarding RabbitMQ message to agent: ${errorMessage}`);
+
+      return null;
     }
   }
 
@@ -121,14 +213,28 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: unknown,
-  ): Promise<void> {
+  ): Promise<SocketAckResponse> {
+    let socketAckResponse: SocketAckResponse;
     const receivedAt = new Date().toISOString();
+    const end = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+      event: AgentEventNames.MESSAGE_TO_DMR_SERVER,
+    });
+
     try {
       const result = await this.messageValidator.validateMessage(data, receivedAt);
       await this.handleValidMessage(result, receivedAt);
+      socketAckResponse = { status: SocketAckStatus.OK };
     } catch (error: unknown) {
       await this.handleMessageError(error);
+
+      socketAckResponse = {
+        status: SocketAckStatus.ERROR,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      };
     }
+
+    end();
+    return socketAckResponse;
   }
 
   private async handleValidMessage(

@@ -1,4 +1,5 @@
-import { AgentMessageDto, IRabbitQueue } from '@dmr/shared';
+import { AgentMessageDto, IRabbitQueue, ISocketAckPayload, SocketAckStatus } from '@dmr/shared';
+import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   forwardRef,
@@ -8,7 +9,6 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as rabbit from 'amqplib';
 import { ConsumeMessage } from 'amqplib';
@@ -239,14 +239,20 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
       const consume = await channel.consume(
         queueName,
-        (message: ConsumeMessage | null): void => {
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        async (message: ConsumeMessage | null): Promise<void> => {
           try {
-            if (message) {
-              this.forwardMessageToAgent(queueName, message);
-              channel.ack(message);
-            } else {
-              this.logger.warn('Message is null');
+            if (!message) {
+              return this.logger.warn('Message is null');
             }
+
+            const result = await this.forwardMessageToAgent(queueName, message);
+
+            if (!result || result.status === SocketAckStatus.ERROR) {
+              return channel.nack(message, false, false);
+            }
+
+            channel.ack(message);
           } catch (error) {
             this.logger.error(`Error processing message from queue ${queueName}:`, error);
             if (message) {
@@ -269,17 +275,24 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private forwardMessageToAgent(agentId: string, message: ConsumeMessage): void {
+  private async forwardMessageToAgent(
+    agentId: string,
+    message: ConsumeMessage,
+  ): Promise<ISocketAckPayload | null> {
     try {
       const messageContent = message.content.toString();
       const parsedMessage = JSON.parse(messageContent) as AgentMessageDto;
 
-      this.agentGateway.forwardMessageToAgent(agentId, parsedMessage);
+      const result = await this.agentGateway.forwardMessageToAgent(agentId, parsedMessage);
       this.logger.log(`Message forwarded to agent ${agentId}`);
+
+      return result;
     } catch (error) {
       if (error instanceof Error) {
         this.logger.error(`Error forwarding message to agent ${agentId}: ${error.message}`);
       }
+
+      return null;
     }
   }
 
@@ -326,7 +339,9 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   get channel(): rabbit.Channel {
     if (!this._channel) {
-      throw new Error('Rabbit channel not defined');
+      this.logger.warn('Rabbit channel not defined, attempting to reconnect...');
+      this.scheduleReconnect();
+      return undefined;
     }
 
     return this._channel;

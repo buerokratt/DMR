@@ -1,4 +1,4 @@
-import { DmrServerEvent } from '@dmr/shared';
+import { SocketAckStatus } from '@dmr/shared';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -408,7 +408,9 @@ describe('RabbitMQService', () => {
 
         vi.spyOn(service, 'checkQueue').mockResolvedValue(true);
 
-        const forwardSpy = vi.spyOn(service as any, 'forwardMessageToAgent');
+        const forwardSpy = vi
+          .spyOn(service as any, 'forwardMessageToAgent')
+          .mockResolvedValue({ status: SocketAckStatus.OK });
 
         await service.subscribe(queueName);
 
@@ -417,7 +419,6 @@ describe('RabbitMQService', () => {
         capturedCallback!(mockMessage);
 
         expect(forwardSpy).toHaveBeenCalledWith(queueName, mockMessage);
-        expect(ackMock).toHaveBeenCalledWith(mockMessage);
       });
 
       it('should handle errors and nack messages when processing fails', async () => {

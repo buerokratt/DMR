@@ -1,10 +1,10 @@
+import { JwtPayload } from '@dmr/shared';
+import { BadRequestException, Logger, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from './auth.service';
 import { CentOpsService } from '../centops/centops.service';
-import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from '@dmr/shared';
-import { Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
-import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
 
 const mockCentOpsService = {
   getCentOpsConfigurationByClientId: vi.fn(),
@@ -45,9 +45,7 @@ describe('AuthService', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    loggerSpy.mockRestore();
-  });
+  afterEach(() => {});
 
   it('should be defined', () => {
     expect(authService).toBeDefined();
@@ -57,7 +55,7 @@ describe('AuthService', () => {
     const testToken = 'mocked.jwt.token';
     const mockClientId = 'mockKid123';
     const mockPublicKey = '-----BEGIN PUBLIC KEY-----mockKey-----END PUBLIC KEY-----';
-    const mockPayload: JwtPayload = { sub: mockClientId, iat: 123, exp: 123 }; // sub matches clientId
+    const mockPayload: JwtPayload = { sub: mockClientId, iat: 123, exp: 123, cat: 175 }; // sub matches clientId
 
     it('should successfully verify a token', async () => {
       vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
@@ -124,7 +122,7 @@ describe('AuthService', () => {
     });
 
     it('should throw BadRequestException if token sub and kid do not match', async () => {
-      const mismatchedPayload: JwtPayload = { sub: 'different-user', iat: 123, exp: 123 };
+      const mismatchedPayload: JwtPayload = { sub: 'different-user', iat: 123, exp: 123, cat: 175 };
       vi.spyOn(authService as any, 'getKidFromToken').mockReturnValue(mockClientId);
       mockCentOpsService.getCentOpsConfigurationByClientId.mockResolvedValueOnce({
         authenticationCertificate: mockPublicKey,
@@ -141,7 +139,9 @@ describe('AuthService', () => {
       expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(testToken, {
         publicKey: mockPublicKey,
       });
-      expect(loggerSpy).toHaveBeenCalledWith('Token sub and kid do not match');
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Token sub: ${mismatchedPayload.sub} and kid: ${mockClientId} do not match`,
+      );
     });
   });
 

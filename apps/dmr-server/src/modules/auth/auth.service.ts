@@ -1,8 +1,8 @@
+import { JwtPayload } from '@dmr/shared';
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { CentOpsService } from '../centops/centops.service';
 import { DecodedJwt, JwtHeader } from './interfaces/headers.interface';
-import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from '@dmr/shared';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +17,8 @@ export class AuthService {
     const clientId = this.getKidFromToken(token);
 
     if (!clientId) {
+      this.logger.error('Token kid is missing or invalid');
+
       throw new BadRequestException('Token kid is missing or invalid');
     }
 
@@ -36,12 +38,12 @@ export class AuthService {
     }
 
     if (verifiedToken.sub !== clientId) {
-      this.logger.error('Token sub and kid do not match');
+      this.logger.error(`Token sub: ${verifiedToken.sub} and kid: ${clientId} do not match`);
 
       throw new BadRequestException('Token sub and kid do not match');
     }
 
-    return verifiedToken;
+    return Object.assign(verifiedToken, { cat: Date.now() });
   }
 
   private decodeJwtHeader(token: string): JwtHeader | null {
@@ -62,6 +64,7 @@ export class AuthService {
       if (error instanceof Error) {
         this.logger.error('Error decoding JWT:', error.message);
       }
+
       return null;
     }
   }

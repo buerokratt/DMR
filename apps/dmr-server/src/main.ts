@@ -1,4 +1,4 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConsoleLogger, LogLevel, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -9,25 +9,37 @@ import { APP_CONFIG_TOKEN, AppConfig, GlobalConfig } from './common/config';
 import { handlers } from './mocks/handlers/centops.response';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: true });
+  const logger = new ConsoleLogger({
+    logLevels: (process.env.LOGGER_LOG_LEVELS?.split(',') as LogLevel[]) || [
+      'error',
+      'warn',
+      'log',
+    ],
+    timestamp: true,
+    colors: process.env.LOGGER_COLORS === 'true',
+  });
 
-  app.use(compression());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    cors: true,
+    bufferLogs: true,
+    logger,
+  });
 
   const configService = app.get<ConfigService<GlobalConfig>>(ConfigService);
   const appConfig = configService.getOrThrow<AppConfig>(APP_CONFIG_TOKEN);
 
+  app.use(compression());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+
   await app.listen(appConfig.port);
 
   if (appConfig.environment === 'development') {
-    const logger = new Logger('bootstrap');
     logger.log(`Listening on ${await app.getUrl()}`);
-
     const server = setupServer(...handlers);
-    server.listen();
+    server.listen({
+      onUnhandledRequest: 'bypass',
+    });
   }
-
-  Logger.log(`🚀 Application is running on: http://localhost:${appConfig.port}`);
 }
 
 void bootstrap();

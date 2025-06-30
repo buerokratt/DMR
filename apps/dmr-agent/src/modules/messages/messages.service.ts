@@ -4,29 +4,44 @@ import {
   AgentEncryptedMessageDto,
   AgentEventNames,
   AgentMessageDto,
+  ValidationErrorType,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
   MessageType,
+  SocketAckResponse,
+  SocketAckStatus,
   Utils,
+  ISocketAckCallback,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
+import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  GatewayTimeoutException,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
-export class AgentsService implements OnModuleInit {
+export class MessagesService implements OnModuleInit {
   private readonly AGENTS_CACHE_KEY = 'DMR_AGENTS_LIST';
-  private readonly logger = new Logger(AgentsService.name);
+  private readonly logger = new Logger(MessagesService.name);
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly websocketService: WebsocketService,
+    private readonly httpService: HttpService,
   ) {}
 
   onModuleInit(): void {
@@ -58,9 +73,12 @@ export class AgentsService implements OnModuleInit {
       void this.handlePartialAgentListEvent(data);
     });
 
-    socket.on(AgentEventNames.MESSAGE_FROM_DMR_SERVER, (data: AgentMessageDto) => {
-      void this.handleMessageFromDMRServerEvent(data);
-    });
+    socket.on(
+      AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+      (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+        void this.handleMessageFromDMRServerEvent(data, ackCb);
+      },
+    );
   }
 
   private async handleFullAgentListEvent(data: IAgentList): Promise<void> {
@@ -127,19 +145,67 @@ export class AgentsService implements OnModuleInit {
     }
   }
 
-  private async handleMessageFromDMRServerEvent(message: AgentMessageDto): Promise<void> {
+  private async handleMessageFromDMRServerEvent(
+    message: AgentMessageDto,
+    ackCb: ISocketAckCallback,
+  ): Promise<void> {
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
       if (!decryptedMessage) {
-        this.logger.error(`Something went wrong while decrypting the message`);
-        return;
+        this.logger.error('Failed to decrypt message from DMR Server');
+
+        return ackCb({
+          status: SocketAckStatus.ERROR,
+          errors: [
+            {
+              type: ValidationErrorType.DECRYPTION_FAILED,
+              message: 'Failed to decrypt message from DMR Server',
+            },
+          ],
+        });
       }
 
+      const outgoingMessage: ExternalServiceMessageDto = {
+        id: message.id,
+        recipientId: message.recipientId,
+        payload: decryptedMessage.payload,
+      };
+
+      await this.handleOutgoingMessage(outgoingMessage);
+
+      this.logger.log(`Successfully processed and forwarded message ${message.id}`);
+
       this.logger.log('Message is decrypted');
+
+      return ackCb({ status: SocketAckStatus.OK });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
+
+      return ackCb({
+        status: SocketAckStatus.ERROR,
+        errors: [
+          {
+            type: ValidationErrorType.DECRYPTION_FAILED,
+            message: errorMessage,
+          },
+        ],
+      });
+    }
+  }
+
+  private async handleOutgoingMessage(message: ExternalServiceMessageDto): Promise<void> {
+    if (!this.agentConfig.outgoingMessageEndpoint) {
+      throw new Error('Outgoing message endpoint not configured');
+    }
+    try {
+      await firstValueFrom(
+        this.httpService.post(this.agentConfig.outgoingMessageEndpoint, message),
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to handle outgoing message: ${errorMessage}`);
     }
   }
 
@@ -151,6 +217,57 @@ export class AgentsService implements OnModuleInit {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error getting agent by ID: ${errorMessage}`);
       return null;
+    }
+  }
+
+  async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
+    const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
+
+    if (!encryptedMessage) {
+      this.logger.error('Message not encrypted');
+      throw new Error('Message not encrypted');
+    }
+
+    this.logger.log(`Message encrypted successfully`);
+
+    if (!this.websocketService.isConnected()) {
+      this.logger.error('WebSocket service is not connected to DMR server.');
+      throw new BadGatewayException('WebSocket service is not connected to DMR server.');
+    }
+
+    const socket = this.websocketService.getSocket();
+
+    if (!socket) {
+      this.logger.error(
+        'Failed to get socket instance even though connection was reported as active',
+      );
+      throw new BadGatewayException(
+        'Failed to get socket instance even though connection was reported as active.',
+      );
+    }
+
+    try {
+      const ack = (await socket.emitWithAck(
+        AgentEventNames.MESSAGE_TO_DMR_SERVER,
+        encryptedMessage,
+      )) as SocketAckResponse;
+
+      if (ack.status === SocketAckStatus.ERROR) {
+        this.logger.error(ack.error);
+        throw new BadRequestException(ack.error);
+      }
+
+      this.logger.log('DMR Server acknowledged message');
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Unexpected error sending message to DMR Server';
+
+      if (error instanceof GatewayTimeoutException || error instanceof BadGatewayException) {
+        throw error;
+      }
+
+      this.logger.error(message);
+      throw new BadGatewayException(message);
     }
   }
 
@@ -174,7 +291,7 @@ export class AgentsService implements OnModuleInit {
 
       const encryptedMessage: AgentEncryptedMessageDto = {
         id: uuid,
-        type: MessageType.Message,
+        type: MessageType.ChatMessage,
         payload: encryptedPayload,
         recipientId: recipient.id,
         senderId: this.agentConfig.id,
@@ -218,6 +335,7 @@ export class AgentsService implements OnModuleInit {
       return decryptedMessage;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+
       this.logger.error(`Error decrypting message: ${errorMessage}`);
       return null;
     }

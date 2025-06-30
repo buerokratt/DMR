@@ -14,13 +14,32 @@ export class RabbitMQMessageService implements OnModuleInit {
   }
 
   constructor(
-    private readonly rabbitMQService: RabbitMQService,
     @Inject(rabbitMQConfig.KEY)
     private readonly rabbitMQConfig: RabbitMQConfig,
+    private readonly rabbitMQService: RabbitMQService,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.setupValidationFailuresQueue();
+    await this.setupValidationFailuresQueueWithRetry();
+  }
+
+  private async setupValidationFailuresQueueWithRetry(retries = 5, delay = 5000): Promise<void> {
+    try {
+      await this.setupValidationFailuresQueue();
+    } catch (error) {
+      if (retries > 0) {
+        this.logger.warn(
+          `Failed to setup validation failures queue. Retrying in ${delay}ms... (${retries} attempts left)`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return this.setupValidationFailuresQueueWithRetry(retries - 1, delay);
+      } else {
+        this.logger.error(
+          'Maximum retry attempts reached for setting up validation failures queue',
+        );
+        throw error;
+      }
+    }
   }
 
   private async setupValidationFailuresQueue(): Promise<void> {

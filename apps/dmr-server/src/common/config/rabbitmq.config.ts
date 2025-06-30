@@ -13,8 +13,8 @@ const variables = Utils.validateObject(
     hostname: String(process.env.RABBITMQ_DEFAULT_HOST),
     managementUIUri: String(process.env.RABBITMQ_DEFAULT_MANAGEMENT_UI_URI),
     dlqTTL: Number(process.env.RABBITMQ_DEFAULT_DLQ_TTL),
-    reconnectInterval: Number(process.env.RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL),
     validationFailuresTTL: Number(process.env.RABBITMQ_VALIDATION_FAILURES_TTL),
+    reconnectInterval: Number(process.env.RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL),
   },
   {
     port: Joi.number().required(),
