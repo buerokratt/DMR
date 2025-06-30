@@ -149,46 +149,46 @@ groups:
 
 Suggested metrics:
 
-- **`rabbitmq_queue_messages_ready` | `gauge`
+- \*\*`rabbitmq_queue_messages_ready` | `gauge`
   number of messages ready for delivery
 
-- **`rabbitmq_queue_messages_unacknowledged` | `gauge`
+- \*\*`rabbitmq_queue_messages_unacknowledged` | `gauge`
   number of messages delivered to consumers but not yet acknowledged
 
-- **`rabbitmq_queue_messages_total` | `counter`
+- \*\*`rabbitmq_queue_messages_total` | `counter`
   total number of messages published to the queue (ready + unacknowledged)
 
-- **`rabbitmq_connections` | `gauge`
+- \*\*`rabbitmq_connections` | `gauge`
   current number of open connections
 
-- **`rabbitmq_channels` | `gauge`
+- \*\*`rabbitmq_channels` | `gauge`
   current number of open AMQP channels
 
-- **`rabbitmq_queue_memory_usage` | `gauge`
+- \*\*`rabbitmq_queue_memory_usage` | `gauge`
   memory used by individual queues
 
-- **`rabbitmq_node_memory_used_bytes` | `gauge`
+- \*\*`rabbitmq_node_memory_used_bytes` | `gauge`
   total memory used by the RabbitMQ node
 
-- **`rabbitmq_node_disk_free` | `gauge`
+- \*\*`rabbitmq_node_disk_free` | `gauge`
   disk space remaining on the node
 
-- **`rabbitmq_node_running` | `gauge`
+- \*\*`rabbitmq_node_running` | `gauge`
   node running status (1 = up, 0 = down)
 
-- **`rabbitmq_erlang_processes` | `gauge`
+- \*\*`rabbitmq_erlang_processes` | `gauge`
   number of Erlang processes currently in use
 
-- **`rabbitmq_vm_memory_limit` | `gauge`
+- \*\*`rabbitmq_vm_memory_limit` | `gauge`
   memory limit of the Erlang VM
 
-- **`rabbitmq_message_stats_publish` | `counter`
+- \*\*`rabbitmq_message_stats_publish` | `counter`
   total number of messages published
 
-- **`rabbitmq_message_stats_ack` | `counter`
+- \*\*`rabbitmq_message_stats_ack` | `counter`
   total number of messages acknowledged
 
-- **`rabbitmq_message_stats_delivery_get` | `counter`
+- \*\*`rabbitmq_message_stats_delivery_get` | `counter`
   total number of messages delivered or fetched from queues
 
 Suggested alert rules:
@@ -239,7 +239,6 @@ Suggested alert rules:
     summary: "RabbitMQ node low disk space"
     description: "Less than 10 GB disk free. Could lead to message persistence issues."
 ```
-
 
 ## Available Scripts
 
