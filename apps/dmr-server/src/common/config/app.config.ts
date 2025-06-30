@@ -14,6 +14,7 @@ const variables = Utils.validateObject(
     websocketMaxDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION),
     loggerLogLevels: (process.env.LOGGER_LOG_LEVELS?.split(',') as LogLevel[]) || undefined,
     loggerColors: process.env.LOGGER_COLORS === 'true',
+    mswEnable: process.env.MSW_ENABLED === 'true',
   },
   {
     port: Joi.number().default(5000),
@@ -23,6 +24,7 @@ const variables = Utils.validateObject(
       .items(Joi.string().valid('log', 'error', 'warn', 'debug', 'verbose'))
       .default(['error', 'warn', 'log']),
     loggerColors: Joi.boolean().default(false),
+    mswEnable: Joi.boolean().default(false),
   },
 );
 
