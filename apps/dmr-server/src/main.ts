@@ -35,9 +35,10 @@ async function bootstrap(): Promise<void> {
 
   if (appConfig.environment === 'development') {
     logger.log(`Listening on ${await app.getUrl()}`);
-
     const server = setupServer(...handlers);
-    server.listen();
+    server.listen({
+      onUnhandledRequest: 'bypass',
+    });
   }
 }
 

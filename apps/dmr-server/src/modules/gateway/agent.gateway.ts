@@ -2,9 +2,9 @@ import {
   AgentEventNames,
   AgentMessageDto,
   DmrServerEvent,
+  ISocketAckPayload,
   SocketAckResponse,
   SocketAckStatus,
-  ISocketAckPayload,
   ValidationErrorDto,
 } from '@dmr/shared';
 import {
@@ -48,6 +48,7 @@ export class AgentGateway
   server!: Server;
 
   private readonly logger = new Logger(AgentGateway.name);
+  private originalEmit: Server['emit'];
   private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
@@ -83,17 +84,19 @@ export class AgentGateway
 
     this.server.on('connection', this.handleConnectionEvent);
 
-    const emit = (event: string, ...arguments_: unknown[]) => {
+    this.originalEmit = this.server.emit;
+
+    this.server.emit = (event: string, ...arguments_: unknown[]) => {
       this.metricService.eventsSentTotalCounter.inc({ event, namespace: '/' });
-
-      return Server.prototype.emit.call(this.server, event, ...arguments_) as boolean;
+      return this.originalEmit.apply(this.server, [event, ...arguments_]) as boolean;
     };
-
-    this.server.emit = emit;
   }
 
   onModuleDestroy() {
     this.server.off('connection', this.handleConnectionEvent);
+    if (this.originalEmit) {
+      this.server.emit = this.originalEmit;
+    }
   }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {
