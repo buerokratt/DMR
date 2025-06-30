@@ -142,6 +142,105 @@ groups:
 
 ---
 
+### RabbitMQ
+
+- [Has per-Agent message queues.](https://www.rabbitmq.com/kubernetes/operator/operator-monitoring)
+- [Has a dead letter queue for messages that failed to deliver.](https://www.rabbitmq.com/docs/prometheus)
+
+Suggested metrics:
+
+- **`rabbitmq_queue_messages_ready` | `gauge`
+  number of messages ready for delivery
+
+- **`rabbitmq_queue_messages_unacknowledged` | `gauge`
+  number of messages delivered to consumers but not yet acknowledged
+
+- **`rabbitmq_queue_messages_total` | `counter`
+  total number of messages published to the queue (ready + unacknowledged)
+
+- **`rabbitmq_connections` | `gauge`
+  current number of open connections
+
+- **`rabbitmq_channels` | `gauge`
+  current number of open AMQP channels
+
+- **`rabbitmq_queue_memory_usage` | `gauge`
+  memory used by individual queues
+
+- **`rabbitmq_node_memory_used_bytes` | `gauge`
+  total memory used by the RabbitMQ node
+
+- **`rabbitmq_node_disk_free` | `gauge`
+  disk space remaining on the node
+
+- **`rabbitmq_node_running` | `gauge`
+  node running status (1 = up, 0 = down)
+
+- **`rabbitmq_erlang_processes` | `gauge`
+  number of Erlang processes currently in use
+
+- **`rabbitmq_vm_memory_limit` | `gauge`
+  memory limit of the Erlang VM
+
+- **`rabbitmq_message_stats_publish` | `counter`
+  total number of messages published
+
+- **`rabbitmq_message_stats_ack` | `counter`
+  total number of messages acknowledged
+
+- **`rabbitmq_message_stats_delivery_get` | `counter`
+  total number of messages delivered or fetched from queues
+
+Suggested alert rules:
+
+```yaml
+  - alert: RabbitMQHighReadyMessages
+  expr: increase(rabbitmq_queue_messages_ready[5m]) > 100000
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "High number of ready messages in RabbitMQ queue"
+    description: "Over 100k messages have accumulated in ready state in the last 5 minutes. Check consumers."
+
+- alert: RabbitMQUnauthorizedAcks
+  expr: rabbitmq_queue_messages_unacknowledged > 50000
+  for: 5m
+  labels:
+    severity: critical
+  annotations:
+    summary: "High unacknowledged messages"
+    description: "More than 50k messages are unacknowledged. Consumers might be slow or stuck."
+
+- alert: RabbitMQNodeDown
+  expr: rabbitmq_node_running == 0
+  for: 1m
+  labels:
+    severity: critical
+  annotations:
+    summary: "RabbitMQ node is down"
+    description: "A RabbitMQ node has stopped running. Immediate attention required."
+
+- alert: RabbitMQMemoryHigh
+  expr: rabbitmq_node_memory_used_bytes / rabbitmq_vm_memory_limit > 0.85
+  for: 10m
+  labels:
+    severity: warning
+  annotations:
+    summary: "RabbitMQ node memory usage high"
+    description: "Memory usage above 85% for more than 10 minutes. Risk of memory alarms."
+
+- alert: RabbitMQDiskLow
+  expr: rabbitmq_node_disk_free < 10 * 1024 * 1024 * 1024
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "RabbitMQ node low disk space"
+    description: "Less than 10 GB disk free. Could lead to message persistence issues."
+```
+
+
 ## Available Scripts
 
 ### Development
