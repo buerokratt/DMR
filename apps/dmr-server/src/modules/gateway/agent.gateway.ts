@@ -48,6 +48,7 @@ export class AgentGateway
   server!: Server;
 
   private readonly logger = new Logger(AgentGateway.name);
+  private originalEmit: Server['emit'];
   private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
@@ -95,6 +96,9 @@ export class AgentGateway
 
   onModuleDestroy() {
     this.server.off('connection', this.handleConnectionEvent);
+    if (this.originalEmit) {
+      this.server.emit = this.originalEmit;
+    }
   }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {

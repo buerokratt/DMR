@@ -2,6 +2,8 @@ FROM node:22.16.0-alpine
 
 WORKDIR /app
 
+RUN apk add --no-cache wget
+
 RUN corepack enable pnpm
 
 COPY package.json pnpm-lock.yaml ./
