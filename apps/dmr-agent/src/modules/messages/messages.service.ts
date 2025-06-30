@@ -4,15 +4,15 @@ import {
   AgentEncryptedMessageDto,
   AgentEventNames,
   AgentMessageDto,
-  ValidationErrorType,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
+  ISocketAckCallback,
   MessageType,
   SocketAckResponse,
   SocketAckStatus,
   Utils,
-  ISocketAckCallback,
+  ValidationErrorType,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -28,9 +28,9 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
+import { firstValueFrom } from 'rxjs';
 import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
-import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class MessagesService implements OnModuleInit {
@@ -172,7 +172,21 @@ export class MessagesService implements OnModuleInit {
         payload: decryptedMessage.payload,
       };
 
-      await this.handleOutgoingMessage(outgoingMessage);
+      const response = await this.handleOutgoingMessage(outgoingMessage);
+
+      if (!response) {
+        this.logger.error('Failed to deliver message to External Service');
+
+        return ackCb({
+          status: SocketAckStatus.ERROR,
+          errors: [
+            {
+              type: ValidationErrorType.DELIVERY_FAILED,
+              message: 'Failed to deliver message to External Service',
+            },
+          ],
+        });
+      }
 
       this.logger.log(`Successfully processed and forwarded message ${message.id}`);
 
@@ -187,7 +201,7 @@ export class MessagesService implements OnModuleInit {
         status: SocketAckStatus.ERROR,
         errors: [
           {
-            type: ValidationErrorType.DECRYPTION_FAILED,
+            type: ValidationErrorType.DELIVERY_FAILED,
             message: errorMessage,
           },
         ],
@@ -195,7 +209,7 @@ export class MessagesService implements OnModuleInit {
     }
   }
 
-  private async handleOutgoingMessage(message: ExternalServiceMessageDto): Promise<void> {
+  private async handleOutgoingMessage(message: ExternalServiceMessageDto): Promise<boolean> {
     if (!this.agentConfig.outgoingMessageEndpoint) {
       throw new Error('Outgoing message endpoint not configured');
     }
@@ -203,9 +217,13 @@ export class MessagesService implements OnModuleInit {
       await firstValueFrom(
         this.httpService.post(this.agentConfig.outgoingMessageEndpoint, message),
       );
+
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to handle outgoing message: ${errorMessage}`);
+      this.logger.error(`Failed to handle outgoing message: ${errorMessage}`);
+
+      return false;
     }
   }
 
