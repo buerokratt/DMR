@@ -105,7 +105,7 @@ Suggested alert rules:
 
 ```yaml
 groups:
-  - name: dmr-server
+  - name: dmr-server-alerts
     rules:
       # Too many disconnected clients suddenly (spike detection)
 
@@ -140,7 +140,86 @@ groups:
 
 ### DMR agent
 
----
+List of metrics:
+
+- **`dmr_http_requests_total`** | `counter` | `method, route, status`
+  Total HTTP requests handled
+  
+- **`dmr_http_request_duration_seconds`** | `histogram` | `method, route, status`
+  HTTP request processing time
+
+- **`dmr_http_errors_total` | `counter`** | `method, route`
+  Count of error responses (4xx/5xx)
+
+- **`dmr_agent_socket_connection_status `** | `gauge`
+  Current number of active Socket.IO connections
+
+- **`dmr_socket_connection_duration_seconds`** | `histogram`
+  Duration of a socket connection session
+
+- **`dmr_socket_errors_total`** | `counter`
+  Total number of connection errors
+
+- **`dmr_socket_events_received_total`** | `counter`
+  Total events received from clients
+  _(labels: `event`, `namespace`)_
+
+- **`dmr_socket_events_sent_total`** | `counter`
+  Total events sent to clients
+  _(labels: `event`, `namespace`)_
+
+- **`dmr_message_processing_duration_seconds`** | `histogram`
+  Time to process/forward a single message
+
+Suggested alert rules:
+
+```yaml
+groups:
+  - name: dmr-agent-alerts
+    rules:
+      - alert: MultipleSocketConnections
+        expr: dmr_agent_socket_connection_status > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Multiple WebSocket connections detected"
+          description: >
+            DMR Agent is expected to maintain only 1 WebSocket connection. Found {{ $value }}.
+
+      - alert: SocketDisconnected
+        expr: dmr_agent_socket_connection_status == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DMR Agent is disconnected from the DMR server"
+          description: >
+            No active WebSocket connection from DMR Agent for over 2 minutes.
+
+      - alert: HighApiLatency
+        expr: |
+          histogram_quantile(0.95, rate(dmr_http_request_duration_seconds_bucket[5m]))
+          > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP latency"
+          description: >
+            95th percentile latency of DMR Agent REST API is over 1s (current: {{ $value }}s)
+
+      - alert: TooManyHttpErrors
+        expr: |
+          rate(dmr_http_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate of HTTP errors"
+          description: >
+            More than 1 HTTP error/sec from DMR Agent (4xx or 5xx responses)
+```
 
 ## Available Scripts
 
