@@ -52,14 +52,14 @@ export class AgentGateway
   private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
-    private readonly authService: AuthService,
     @Inject(forwardRef(() => RabbitMQService))
     private readonly rabbitService: RabbitMQService,
-    private readonly messageValidator: MessageValidatorService,
     @Inject(forwardRef(() => RabbitMQMessageService))
     private readonly rabbitMQMessageService: RabbitMQMessageService,
+    private readonly messageValidator: MessageValidatorService,
     private readonly centOpsService: CentOpsService,
     private readonly metricService: MetricService,
+    private readonly authService: AuthService,
   ) {}
 
   onModuleInit() {
