@@ -3,12 +3,11 @@ import {
   AgentDto,
   AgentEncryptedMessageDto,
   AgentEventNames,
-  AgentMessageDto,
+  ChatMessagePayloadDto,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
   ISocketAckCallback,
-  MessageType,
   SocketAckResponse,
   SocketAckStatus,
   Utils,
@@ -146,7 +145,7 @@ export class MessagesService implements OnModuleInit {
   }
 
   private async handleMessageFromDMRServerEvent(
-    message: AgentMessageDto,
+    message: AgentEncryptedMessageDto,
     ackCb: ISocketAckCallback,
   ): Promise<void> {
     try {
@@ -169,7 +168,9 @@ export class MessagesService implements OnModuleInit {
       const outgoingMessage: ExternalServiceMessageDto = {
         id: message.id,
         recipientId: message.recipientId,
-        payload: decryptedMessage.payload,
+        timestamp: message.timestamp,
+        type: message.type,
+        payload: decryptedMessage.payload as ChatMessagePayloadDto,
       };
 
       const response = await this.handleOutgoingMessage(outgoingMessage);
@@ -309,11 +310,11 @@ export class MessagesService implements OnModuleInit {
 
       const encryptedMessage: AgentEncryptedMessageDto = {
         id: uuid,
-        type: MessageType.ChatMessage,
+        type: message.type,
         payload: encryptedPayload,
         recipientId: recipient.id,
         senderId: this.agentConfig.id,
-        timestamp: new Date().toISOString(),
+        timestamp: message.timestamp,
       };
 
       return encryptedMessage;

@@ -1,6 +1,5 @@
+import 'reflect-metadata';
 import { afterAll, beforeAll, vi } from 'vitest';
-
-import('reflect-metadata');
 
 beforeAll(() => {
   // Add any global setup here

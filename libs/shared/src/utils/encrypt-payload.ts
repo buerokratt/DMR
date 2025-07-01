@@ -3,7 +3,7 @@ import { CompactEncrypt, importPKCS8, importSPKI, SignJWT } from 'jose';
 const encoder = new TextEncoder();
 
 export const encryptPayload = async (
-  payload: string[],
+  payload: unknown,
   senderPrivateKeyString: string,
   recipientPublicKeyString: string,
 ): Promise<string> => {
