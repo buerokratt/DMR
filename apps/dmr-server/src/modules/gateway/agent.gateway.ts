@@ -6,6 +6,7 @@ import {
   SocketAckResponse,
   SocketAckStatus,
   ValidationErrorDto,
+  ValidationErrorType,
 } from '@dmr/shared';
 import {
   BadRequestException,
@@ -171,9 +172,10 @@ export class AgentGateway
   ): Promise<ISocketAckPayload | null> {
     try {
       const socket = this.findSocketByAgentId(agentId);
+
       if (!socket) {
         this.logger.warn(`No connected socket found for agent ${agentId}`);
-        return;
+        return null;
       }
 
       const response = (await socket.emitWithAck(
@@ -182,11 +184,15 @@ export class AgentGateway
       )) as ISocketAckPayload;
 
       if (response.status === SocketAckStatus.ERROR) {
-        await this.rabbitMQMessageService.sendValidationFailure(
-          message,
-          response.errors,
-          message.receivedAt ?? new Date().toISOString(),
-        );
+        const errorTypes = response.errors.map((error) => error.type);
+
+        if (errorTypes.includes(ValidationErrorType.DELIVERY_FAILED)) {
+          await this.rabbitMQMessageService.sendValidationFailure(
+            message,
+            response.errors,
+            message.receivedAt ?? new Date().toISOString(),
+          );
+        }
       }
 
       this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
