@@ -811,7 +811,7 @@ describe('AgentsService', () => {
         decryptedMessage,
       );
       vi.spyOn(service as any, 'handleOutgoingMessage').mockResolvedValueOnce(false);
-      
+
       await (service as any).handleMessageFromDMRServerEvent(message, ackCbSpy);
 
       expect(ackCbSpy).toHaveBeenCalledWith(
