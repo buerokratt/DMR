@@ -3,16 +3,15 @@ import {
   AgentDto,
   AgentEncryptedMessageDto,
   AgentEventNames,
-  AgentMessageDto,
-  ValidationErrorType,
+  ChatMessagePayloadDto,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
-  MessageType,
+  ISocketAckCallback,
   SocketAckResponse,
   SocketAckStatus,
   Utils,
-  ISocketAckCallback,
+  ValidationErrorType,
 } from '@dmr/shared';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -28,9 +27,9 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
+import { firstValueFrom } from 'rxjs';
 import { AgentConfig, agentConfig } from '../../common/config';
 import { WebsocketService } from '../websocket/websocket.service';
-import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class MessagesService implements OnModuleInit {
@@ -146,7 +145,7 @@ export class MessagesService implements OnModuleInit {
   }
 
   private async handleMessageFromDMRServerEvent(
-    message: AgentMessageDto,
+    message: AgentEncryptedMessageDto,
     ackCb: ISocketAckCallback,
   ): Promise<void> {
     try {
@@ -169,7 +168,9 @@ export class MessagesService implements OnModuleInit {
       const outgoingMessage: ExternalServiceMessageDto = {
         id: message.id,
         recipientId: message.recipientId,
-        payload: decryptedMessage.payload,
+        timestamp: message.timestamp,
+        type: message.type,
+        payload: decryptedMessage.payload as unknown as ChatMessagePayloadDto,
       };
 
       await this.handleOutgoingMessage(outgoingMessage);
@@ -291,11 +292,11 @@ export class MessagesService implements OnModuleInit {
 
       const encryptedMessage: AgentEncryptedMessageDto = {
         id: uuid,
-        type: MessageType.ChatMessage,
+        type: message.type,
         payload: encryptedPayload,
         recipientId: recipient.id,
         senderId: this.agentConfig.id,
-        timestamp: new Date().toISOString(),
+        timestamp: message.timestamp,
       };
 
       return encryptedMessage;
