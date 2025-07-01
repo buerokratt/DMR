@@ -1,8 +1,8 @@
+import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
-import { MessagesService } from './messages.service';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { MessagesController } from './messages.controller';
-import { HttpModule } from '@nestjs/axios';
+import { MessagesService } from './messages.service';
 
 @Module({
   controllers: [MessagesController],
