@@ -19,16 +19,24 @@ import { Metrics } from './metrics';
   providers: [
     MetricService,
     makeGaugeProvider({
-      name: Metrics.dmrSocketConnectionsActive,
-      help: Metrics.dmrSocketConnectionsActiveHelp,
+      name: Metrics.dmrSocketConnectionStatus,
+      help: Metrics.dmrSocketConnectionStatusHelp,
     }),
     makeCounterProvider({
-      name: Metrics.dmrSocketConnectionsTotal,
-      help: Metrics.dmrSocketConnectionsTotalHelp,
+      name: Metrics.dmrHttpRequestTotal,
+      help: Metrics.dmrHttpRequestTotalHelp,
+      labelNames: ['method', 'route', 'status'],
     }),
     makeCounterProvider({
-      name: Metrics.dmrSocketDisconnectionsTotal,
-      help: Metrics.dmrSocketDisconnectionsTotalHelp,
+      name: Metrics.dmrHttpErrorsTotal,
+      help: Metrics.dmrHttpErrorsTotalHelp,
+      labelNames: ['method', 'route'],
+    }),
+    makeHistogramProvider({
+      name: Metrics.dmrHttpRequestDurationSeconds,
+      help: Metrics.dmrHttpRequestDurationSecondsHelp,
+      buckets: [0.01, 0.05, 0.1, 0.3, 0.5, 1, 2, 5], // sec
+      labelNames: ['method', 'route', 'status'],
     }),
     makeHistogramProvider({
       name: Metrics.dmrSocketConnectionDurationSeconds,

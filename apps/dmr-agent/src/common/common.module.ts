@@ -1,7 +1,9 @@
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { MetricModule } from '../libs/metrics';
 import { configs } from './config';
+import { MetricInterceptor } from './interceptors/metric.interceptor';
 import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
 
 @Module({
@@ -20,7 +22,8 @@ import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
     CacheModule.register({
       isGlobal: true,
     }),
+    MetricModule,
   ],
-  providers: [TimeoutInterceptor],
+  providers: [TimeoutInterceptor, MetricInterceptor],
 })
 export class CommonModule {}

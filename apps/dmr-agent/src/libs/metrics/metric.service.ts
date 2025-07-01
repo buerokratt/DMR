@@ -6,14 +6,16 @@ import { Metrics } from './metrics';
 @Injectable()
 export class MetricService {
   constructor(
+    @InjectMetric(Metrics.dmrHttpRequestTotal)
+    private readonly _httpRequestTotalCounter: Counter<string>,
+    @InjectMetric(Metrics.dmrHttpErrorsTotal)
+    private readonly __httpErrorsTotalCounter: Counter<string>,
+    @InjectMetric(Metrics.dmrHttpRequestDurationSeconds)
+    private readonly _httpRequestDurationSecondsHistogram: Histogram<string>,
     @InjectMetric(Metrics.dmrSocketErrorsTotal)
     private readonly _errorsTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketConnectionsActive)
-    private readonly _activeConnectionGauge: Gauge<string>,
-    @InjectMetric(Metrics.dmrSocketConnectionsTotal)
-    private readonly _connectionsTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketDisconnectionsTotal)
-    private readonly _disconnectionsTotalCounter: Counter<string>,
+    @InjectMetric(Metrics.dmrSocketConnectionStatus)
+    private readonly _activeConnectionStatusGauge: Gauge<string>,
     @InjectMetric(Metrics.dmrSocketEventsReceivedTotal)
     private readonly _eventsReceivedTotalCounter: Counter<string>,
     @InjectMetric(Metrics.dmrSocketEventsSentTotal)
@@ -24,20 +26,24 @@ export class MetricService {
     private readonly _messageProcessingDurationSecondsHistogram: Histogram<string>,
   ) {}
 
+  get httpRequestTotalCounter(): Counter<string> {
+    return this._httpRequestTotalCounter;
+  }
+
+  get httpErrorsTotalCounter(): Counter<string> {
+    return this.__httpErrorsTotalCounter;
+  }
+
+  get httpRequestDurationSecondsHistogram(): Histogram<string> {
+    return this._httpRequestDurationSecondsHistogram;
+  }
+
   get errorsTotalCounter(): Counter<string> {
     return this._errorsTotalCounter;
   }
 
-  get activeConnectionGauge(): Gauge<string> {
-    return this._activeConnectionGauge;
-  }
-
-  get connectionsTotalCounter(): Counter<string> {
-    return this._connectionsTotalCounter;
-  }
-
-  get disconnectionsTotalCounter(): Counter<string> {
-    return this._disconnectionsTotalCounter;
+  get activeConnectionStatusGauge(): Gauge<string> {
+    return this._activeConnectionStatusGauge;
   }
 
   get eventsReceivedTotalCounter(): Counter<string> {

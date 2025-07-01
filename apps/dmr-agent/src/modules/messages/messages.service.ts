@@ -29,6 +29,7 @@ import {
 } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { AgentConfig, agentConfig } from '../../common/config';
+import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
@@ -40,6 +41,7 @@ export class MessagesService implements OnModuleInit {
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly websocketService: WebsocketService,
+    private readonly metricService: MetricService,
     private readonly httpService: HttpService,
   ) {}
 
@@ -170,7 +172,7 @@ export class MessagesService implements OnModuleInit {
         recipientId: message.recipientId,
         timestamp: message.timestamp,
         type: message.type,
-        payload: decryptedMessage.payload as unknown as ChatMessagePayloadDto,
+        payload: decryptedMessage.payload as ChatMessagePayloadDto,
       };
 
       await this.handleOutgoingMessage(outgoingMessage);
@@ -222,6 +224,7 @@ export class MessagesService implements OnModuleInit {
   }
 
   async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
+    this.metricService.httpRequestTotalCounter.inc({});
     const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
 
     if (!encryptedMessage) {
