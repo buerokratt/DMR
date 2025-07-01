@@ -144,7 +144,6 @@ List of metrics:
 
 - **`dmr_http_requests_total`** | `counter` | `method, route, status`
   Total HTTP requests handled
-  
 - **`dmr_http_request_duration_seconds`** | `histogram` | `method, route, status`
   HTTP request processing time
 
@@ -183,7 +182,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Multiple WebSocket connections detected"
+          summary: 'Multiple WebSocket connections detected'
           description: >
             DMR Agent is expected to maintain only 1 WebSocket connection. Found {{ $value }}.
 
@@ -193,7 +192,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "DMR Agent is disconnected from the DMR server"
+          summary: 'DMR Agent is disconnected from the DMR server'
           description: >
             No active WebSocket connection from DMR Agent for over 2 minutes.
 
@@ -205,7 +204,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High HTTP latency"
+          summary: 'High HTTP latency'
           description: >
             95th percentile latency of DMR Agent REST API is over 1s (current: {{ $value }}s)
 
@@ -216,7 +215,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High rate of HTTP errors"
+          summary: 'High rate of HTTP errors'
           description: >
             More than 1 HTTP error/sec from DMR Agent (4xx or 5xx responses)
 ```
