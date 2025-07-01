@@ -175,7 +175,21 @@ export class MessagesService implements OnModuleInit {
         payload: decryptedMessage.payload as ChatMessagePayloadDto,
       };
 
-      await this.handleOutgoingMessage(outgoingMessage);
+      const response = await this.handleOutgoingMessage(outgoingMessage);
+
+      if (!response) {
+        this.logger.error('Failed to deliver message to External Service');
+
+        return ackCb({
+          status: SocketAckStatus.ERROR,
+          errors: [
+            {
+              type: ValidationErrorType.DELIVERY_FAILED,
+              message: 'Failed to deliver message to External Service',
+            },
+          ],
+        });
+      }
 
       this.logger.log(`Successfully processed and forwarded message ${message.id}`);
 
@@ -190,7 +204,7 @@ export class MessagesService implements OnModuleInit {
         status: SocketAckStatus.ERROR,
         errors: [
           {
-            type: ValidationErrorType.DECRYPTION_FAILED,
+            type: ValidationErrorType.DELIVERY_FAILED,
             message: errorMessage,
           },
         ],
@@ -198,7 +212,7 @@ export class MessagesService implements OnModuleInit {
     }
   }
 
-  private async handleOutgoingMessage(message: ExternalServiceMessageDto): Promise<void> {
+  private async handleOutgoingMessage(message: ExternalServiceMessageDto): Promise<boolean> {
     if (!this.agentConfig.outgoingMessageEndpoint) {
       throw new Error('Outgoing message endpoint not configured');
     }
@@ -206,9 +220,13 @@ export class MessagesService implements OnModuleInit {
       await firstValueFrom(
         this.httpService.post(this.agentConfig.outgoingMessageEndpoint, message),
       );
+
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to handle outgoing message: ${errorMessage}`);
+      this.logger.error(`Failed to handle outgoing message: ${errorMessage}`);
+
+      return false;
     }
   }
 

@@ -1,4 +1,10 @@
-import { AgentMessageDto, IRabbitQueue, ISocketAckPayload, SocketAckStatus } from '@dmr/shared';
+import {
+  AgentMessageDto,
+  IRabbitQueue,
+  ISocketAckPayload,
+  SocketAckStatus,
+  ValidationErrorType,
+} from '@dmr/shared';
 import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
@@ -235,29 +241,43 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         return false;
       }
 
-      const consume = await channel.consume(
-        queueName,
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        async (message: ConsumeMessage | null): Promise<void> => {
-          try {
-            if (!message) {
-              return this.logger.warn('Message is null');
-            }
+      const handleMessage = async (message: ConsumeMessage | null): Promise<void> => {
+        try {
+          if (!message) {
+            return this.logger.warn('Message is null');
+          }
 
-            const result = await this.forwardMessageToAgent(queueName, message);
+          const result = await this.forwardMessageToAgent(queueName, message);
 
-            if (!result || result.status === SocketAckStatus.ERROR) {
+          if (!result) {
+            return channel.nack(message, false, true);
+          }
+
+          if (result.status === SocketAckStatus.ERROR) {
+            const errorTypes = result.errors.map((error) => error.type);
+
+            if (errorTypes.includes(ValidationErrorType.DECRYPTION_FAILED)) {
               return channel.nack(message, false, false);
             }
 
-            channel.ack(message);
-          } catch (error) {
-            this.logger.error(`Error processing message from queue ${queueName}:`, error);
-            if (message) {
-              channel.nack(message, false, false);
+            if (errorTypes.includes(ValidationErrorType.DELIVERY_FAILED)) {
+              return channel.nack(message, false, true);
             }
           }
-        },
+
+          channel.ack(message);
+        } catch (error) {
+          this.logger.error(`Error processing message from queue ${queueName}:`, error);
+          if (message) {
+            channel.nack(message, false, false);
+          }
+        }
+      };
+
+      const consume = await channel.consume(
+        queueName,
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        handleMessage,
         { noAck: false },
       );
 

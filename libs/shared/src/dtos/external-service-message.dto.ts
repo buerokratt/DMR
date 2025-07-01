@@ -170,7 +170,7 @@ export class ChatMessagePayloadDto {
 }
 
 export class ExternalServiceMessageDto extends Message<ChatMessagePayloadDto> {
-  @ValidateIf((obj) => obj.type === MessageType.ChatMessage)
+  @ValidateIf((object: { type: MessageType }) => object.type === MessageType.ChatMessage)
   @ValidateNested()
   @Type(() => ChatMessagePayloadDto)
   payload!: ChatMessagePayloadDto;
