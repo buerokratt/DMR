@@ -25,6 +25,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
@@ -33,7 +34,7 @@ import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
-export class MessagesService implements OnModuleInit {
+export class MessagesService implements OnModuleInit, OnModuleDestroy {
   private readonly AGENTS_CACHE_KEY = 'DMR_AGENTS_LIST';
   private readonly logger = new Logger(MessagesService.name);
 
@@ -47,6 +48,12 @@ export class MessagesService implements OnModuleInit {
 
   onModuleInit(): void {
     this.setupSocketEventListeners();
+  }
+
+  onModuleDestroy() {
+    const socket = this.websocketService.getSocket();
+
+    socket.removeAllListeners();
   }
 
   private setupSocketEventListeners(): void {
@@ -66,18 +73,36 @@ export class MessagesService implements OnModuleInit {
       return;
     }
 
-    socket.on(AgentEventNames.FULL_AGENT_LIST, (data: IAgentList) => {
-      void this.handleFullAgentListEvent(data);
+    socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: IAgentList) => {
+      const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+        event: AgentEventNames.FULL_AGENT_LIST,
+      });
+
+      await this.handleFullAgentListEvent(data);
+
+      endTimer();
     });
 
-    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, (data: IAgentList) => {
-      void this.handlePartialAgentListEvent(data);
+    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgentList) => {
+      const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+        event: AgentEventNames.PARTIAL_AGENT_LIST,
+      });
+
+      await this.handlePartialAgentListEvent(data);
+
+      endTimer();
     });
 
     socket.on(
       AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-      (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
-        void this.handleMessageFromDMRServerEvent(data, ackCb);
+      async (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+        const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+          event: AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+        });
+
+        await this.handleMessageFromDMRServerEvent(data, ackCb);
+
+        endTimer();
       },
     );
   }
@@ -242,7 +267,6 @@ export class MessagesService implements OnModuleInit {
   }
 
   async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
-    this.metricService.httpRequestTotalCounter.inc({});
     const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
 
     if (!encryptedMessage) {

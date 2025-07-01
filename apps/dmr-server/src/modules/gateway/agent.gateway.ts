@@ -36,7 +36,7 @@ import { CentOpsConfigurationDifference } from '../centops/interfaces/cent-ops-c
 import { MessageValidatorService } from './message-validator.service';
 
 @WebSocketGateway({
-  namespace: '/v1/dmr-agent-events',
+  namespace: String(process.env.WEB_SOCKET_NAMESPACE ?? '/v1/dmr-agent-events'),
   connectionStateRecovery: {
     maxDisconnectionDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION || '120000'),
     skipMiddlewares: true,
@@ -49,7 +49,6 @@ export class AgentGateway
   server!: Server;
 
   private readonly logger = new Logger(AgentGateway.name);
-  private originalEmit: Server['emit'];
   private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
@@ -74,32 +73,35 @@ export class AgentGateway
         if (!ignored.includes(event)) {
           this.metricService.eventsReceivedTotalCounter.inc({
             event,
-            namespace: this.server.of.name,
+            namespace: socket.nsp.name,
           });
         }
       });
 
       socket.onAnyOutgoing((event: string) => {
-        this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: socket.nsp.name });
       });
     };
 
     this.server.on('connection', this.handleConnectionEvent);
 
-    const emit = (event: string, ...arguments_: unknown[]) => {
-      this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
+    const originalServerEmit = this.server.emit.bind(this.server) as Server['emit'];
 
-      return Server.prototype.emit.call(this.server, event, ...arguments_) as boolean;
+    const serverEmit: Server['emit'] = (event: string, ...arguments_: unknown[]) => {
+      const sockets = this.server.sockets as unknown as Map<string, Socket>;
+
+      for (const socket of [...sockets.values()]) {
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: socket.nsp.name });
+      }
+
+      return originalServerEmit(event, arguments_);
     };
 
-    this.server.emit = emit;
+    this.server.emit = serverEmit;
   }
 
   onModuleDestroy() {
     this.server.off('connection', this.handleConnectionEvent);
-    if (this.originalEmit) {
-      this.server.emit = this.originalEmit;
-    }
   }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {

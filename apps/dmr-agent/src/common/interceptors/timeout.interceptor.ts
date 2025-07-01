@@ -12,11 +12,11 @@ import { AppConfig, appConfig } from '../config';
 
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {
-  constructor(@Inject(appConfig.KEY) private readonly agentConfig: AppConfig) {}
+  constructor(@Inject(appConfig.KEY) private readonly appConfig: AppConfig) {}
 
   intercept(context: ExecutionContext, next: CallHandler) {
     return next.handle().pipe(
-      timeout(this.agentConfig.messageDeliveryTimeoutMs),
+      timeout(this.appConfig.messageDeliveryTimeoutMs),
       catchError((error: unknown) => {
         if (error instanceof TimeoutError) {
           return throwError(() => new GatewayTimeoutException());

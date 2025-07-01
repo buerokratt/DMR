@@ -1,22 +1,23 @@
 import { JwtPayload } from '@dmr/shared';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { DefaultEventsMap } from 'socket.io';
 import { io, ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 import { AgentConfig, agentConfig } from '../../common/config/agent.config';
-import { DMRServerConfig, dmrServerConfig } from '../../common/config/dmr-server.config';
 import { webSocketConfig, WebSocketConfig } from '../../common/config/web-socket.config';
+import { MetricService } from '../../libs/metrics';
 
 @Injectable()
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WebsocketService.name);
-  private socket: Socket | null = null;
+  private socket: Socket<DefaultEventsMap, DefaultEventsMap> | null = null;
   private reconnectionAttempts = 0;
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
-    @Inject(dmrServerConfig.KEY) private readonly dmrServerConfig: DMRServerConfig,
     @Inject(webSocketConfig.KEY) private readonly webSocketConfig: WebSocketConfig,
     private readonly jwtService: JwtService,
+    private readonly metricService: MetricService,
   ) {}
 
   onModuleInit(): void {
@@ -33,7 +34,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
         },
       };
 
-      this.socket = io(this.dmrServerConfig.webSocketURL, socketOptions);
+      this.socket = io(this.webSocketConfig.url + this.webSocketConfig.namespace, socketOptions);
 
       this.setupSocketEventListeners();
     } catch (error) {
@@ -48,7 +49,11 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    let startTime: number;
+
     this.socket.on('connect', () => {
+      startTime = Date.now();
+      this.metricService.activeConnectionStatusGauge.inc(1);
       this.reconnectionAttempts = 0;
 
       if (this.socket) {
@@ -60,6 +65,14 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.socket.on('disconnect', (reason: string) => {
+      this.metricService.activeConnectionStatusGauge.dec(1);
+
+      if (startTime) {
+        const durationSeconds = (Date.now() - startTime) / 1000;
+        this.metricService.socketConnectionDurationSecondsHistogram.observe(durationSeconds);
+        startTime = undefined;
+      }
+
       this.logger.warn(`Disconnected from DMR server. Reason: ${reason}`);
     });
 
@@ -90,6 +103,27 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
 
     this.socket.on('reconnect_failed', () => {
       this.logger.error('Failed to reconnect to DMR server');
+    });
+
+    this.socket.onAny((event: string) => {
+      if (event === 'error') {
+        this.metricService.errorsTotalCounter.inc(1);
+      }
+
+      const ignored = ['ping', 'disconnect', 'connect', 'error'];
+      if (!ignored.includes(event)) {
+        this.metricService.eventsReceivedTotalCounter.inc({
+          event,
+          namespace: this.webSocketConfig.namespace,
+        });
+      }
+    });
+
+    this.socket.onAnyOutgoing((event: string) => {
+      this.metricService.eventsSentTotalCounter.inc({
+        event,
+        namespace: this.webSocketConfig.namespace,
+      });
     });
   }
 
@@ -125,6 +159,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   disconnect(): void {
     if (this.socket) {
       this.socket.disconnect();
+      this.socket.removeAllListeners();
     }
   }
 }

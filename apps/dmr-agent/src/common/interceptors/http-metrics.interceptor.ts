@@ -4,7 +4,7 @@ import { catchError, tap, throwError } from 'rxjs';
 import { MetricService } from '../../libs/metrics';
 
 @Injectable()
-export class MetricInterceptor implements NestInterceptor {
+export class HttpMetricsInterceptor implements NestInterceptor {
   constructor(private readonly metricService: MetricService) {}
 
   intercept(context: ExecutionContext, next: CallHandler) {
@@ -13,6 +13,11 @@ export class MetricInterceptor implements NestInterceptor {
 
     const method = request.method;
     const route = (request.route as unknown as { path?: string })?.path || request.url;
+
+    const stopTimer = this.metricService.httpRequestDurationSecondsHistogram.startTimer({
+      route,
+      method,
+    });
 
     return next.handle().pipe(
       tap(() => {
@@ -23,12 +28,18 @@ export class MetricInterceptor implements NestInterceptor {
           method,
           status,
         });
+
+        stopTimer({ status });
       }),
       catchError((error: Error) => {
+        const status = response.statusCode.toString();
+
         this.metricService.httpErrorsTotalCounter.inc({
           route,
           method,
         });
+
+        stopTimer({ status });
         return throwError(() => error);
       }),
     );

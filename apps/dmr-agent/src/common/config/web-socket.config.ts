@@ -6,10 +6,14 @@ export const WEB_SOCKET_CONFIG_TOKEN = Symbol('WEB_SOCKET_CONFIG_TOKEN');
 
 const variables = Utils.validateObject(
   {
+    url: String(process.env.DMR_SERVER_WEBSOCKET_URL),
+    namespace: String(process.env.DMR_SERVER_WEBSOCKET_NAMESPACE),
     reconnectionDelayMin: Number(process.env.WEBSOCKET_RECONNECTION_DELAY),
     reconnectionDelayMax: Number(process.env.WEBSOCKET_RECONNECTION_DELAY_MAX),
   },
   {
+    url: Joi.string().uri().required(),
+    namespace: Joi.string().default('/v1/dmr-agent-events'),
     reconnectionDelayMin: Joi.number().default(1000),
     reconnectionDelayMax: Joi.number().default(5000),
   },

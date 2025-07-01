@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
-import { agentConfig, dmrServerConfig, webSocketConfig } from '../../common/config';
+import { agentConfig, webSocketConfig } from '../../common/config';
 import { WebsocketService } from './websocket.service';
 
 vi.mock('socket.io-client', () => ({
@@ -35,14 +35,13 @@ describe('WebsocketService', () => {
           },
         },
         {
-          provide: dmrServerConfig.KEY,
-          useValue: { webSocketURL: 'http://localhost:3000' },
-        },
-        {
           provide: webSocketConfig.KEY,
           useValue: {
             reconnectionDelayMin: 1000,
             reconnectionDelayMax: 5000,
+            url: 'http://localhost:3000',
+            namespace: 'namespace',
+            messageDeliveryTimeoutMs: 2000,
           },
         },
         {

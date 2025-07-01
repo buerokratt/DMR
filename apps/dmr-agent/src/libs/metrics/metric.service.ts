@@ -9,7 +9,7 @@ export class MetricService {
     @InjectMetric(Metrics.dmrHttpRequestTotal)
     private readonly _httpRequestTotalCounter: Counter<string>,
     @InjectMetric(Metrics.dmrHttpErrorsTotal)
-    private readonly __httpErrorsTotalCounter: Counter<string>,
+    private readonly _httpErrorsTotalCounter: Counter<string>,
     @InjectMetric(Metrics.dmrHttpRequestDurationSeconds)
     private readonly _httpRequestDurationSecondsHistogram: Histogram<string>,
     @InjectMetric(Metrics.dmrSocketErrorsTotal)
@@ -31,7 +31,7 @@ export class MetricService {
   }
 
   get httpErrorsTotalCounter(): Counter<string> {
-    return this.__httpErrorsTotalCounter;
+    return this._httpErrorsTotalCounter;
   }
 
   get httpRequestDurationSecondsHistogram(): Histogram<string> {
