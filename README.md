@@ -69,6 +69,37 @@ graph TD
 - Supports RabbitMQ clustering for scalability.
 - https://www.rabbitmq.com/kubernetes/operator/operator-monitoring
 
+#### Queues
+
+The RabbitMQ setup includes several types of queues to handle message routing and failure scenarios:
+
+**Normal Queues (per Agent)**
+- Each DMR agent has its own dedicated message queue for receiving messages
+- Queue naming convention: `{agent-id}` (the agent ID serves as the queue name)
+- All queues are configured as quorum queues for enhanced durability and consistency
+- Messages have configurable TTL (time-to-live) with automatic expiration
+
+**Dead Letter Queues (DLQs)**
+- Each agent queue has a corresponding dead letter queue: `{agent-id}.dlq`
+- DLQs are automatically created when setting up agent queues
+- Messages are moved to DLQ when:
+  - Processing fails and message is NACKed (not acknowledged) with requeue=false
+  - Message TTL expires in the original queue
+- DLQs have their own TTL configuration (`dlqTTL`) for automatic cleanup
+- DLQs store failed messages for manual inspection and potential reprocessing
+
+**Queue Configuration**
+- **Queue Type**: All queues use `x-queue-type: quorum` for high availability
+- **TTL Settings**: Configurable message TTL via `x-message-ttl`
+- **Dead Letter Routing**: Uses default exchange with `x-dead-letter-routing-key` pointing to DLQ
+- **Durability**: All queues are durable and survive broker restarts
+
+**Message Processing & Delivery**
+- Messages are processed with manual acknowledgment (`noAck: false`)
+- Failed message processing results in NACK with `requeue: false`, sending messages to DLQ
+- No explicit delivery count limit - RabbitMQ handles retries based on TTL and DLQ configuration
+- Consumer subscription management with stored consumer tags for proper cleanup
+
 ## Prometheus
 
 ### DMR server
