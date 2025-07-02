@@ -17,10 +17,37 @@ import * as classValidator from 'class-validator';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentConfig, AgentConfig } from '../../common/config';
+import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 import { MessagesService } from './messages.service';
 
-describe('AgentsService', () => {
+const mockCounter = {
+  inc: vi.fn(),
+};
+
+const mockGauge = {
+  inc: vi.fn(),
+  dec: vi.fn(),
+};
+
+const mockHistogram = {
+  observe: vi.fn(),
+  startTimer: vi.fn(() => vi.fn()),
+};
+
+const mockMetricService = {
+  httpRequestTotalCounter: mockCounter,
+  httpErrorsTotalCounter: mockCounter,
+  httpRequestDurationSecondsHistogram: mockCounter,
+  errorsTotalCounter: mockCounter,
+  activeConnectionStatusGauge: mockGauge,
+  eventsReceivedTotalCounter: mockCounter,
+  eventsSentTotalCounter: mockCounter,
+  socketConnectionDurationSecondsHistogram: mockHistogram,
+  messageProcessingDurationSecondsHistogram: mockHistogram,
+};
+
+describe('MessageService', () => {
   let service: MessagesService;
   let websocketService: WebsocketService;
   let cacheManager: Cache;
@@ -80,6 +107,7 @@ describe('AgentsService', () => {
             post: vi.fn().mockReturnValue(of({ data: {} })),
           },
         },
+        { provide: MetricService, useValue: mockMetricService },
       ],
     }).compile();
 
