@@ -7,7 +7,7 @@ export const WEB_SOCKET_CONFIG_TOKEN = Symbol('WEB_SOCKET_CONFIG_TOKEN');
 const variables = Utils.validateObject(
   {
     url: String(process.env.DMR_SERVER_WEBSOCKET_URL),
-    namespace: String(process.env.DMR_SERVER_WEBSOCKET_NAMESPACE),
+    namespace: String('/v1/dmr-agent-events'),
     reconnectionDelayMin: Number(process.env.WEBSOCKET_RECONNECTION_DELAY),
     reconnectionDelayMax: Number(process.env.WEBSOCKET_RECONNECTION_DELAY_MAX),
   },

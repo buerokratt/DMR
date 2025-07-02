@@ -12,7 +12,7 @@ const variables = Utils.validateObject(
     port: Number(process.env.PORT),
     environment: process.env.ENVIRONMENT as Environment,
     websocketMaxDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION),
-    websocketNamespace: String(process.env.WEB_SOCKET_NAMESPACE),
+    websocketNamespace: String('/v1/dmr-agent-events'),
     loggerLogLevels: (process.env.LOGGER_LOG_LEVELS?.split(',') as LogLevel[]) || undefined,
     loggerColors: process.env.LOGGER_COLORS === 'true',
     mswEnable: process.env.MSW_ENABLED === 'true',

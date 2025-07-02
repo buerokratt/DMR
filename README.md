@@ -144,6 +144,7 @@ List of metrics:
 
 - **`dmr_http_requests_total`** | `counter` | `method, route, status`
   Total HTTP requests handled
+  
 - **`dmr_http_request_duration_seconds`** | `histogram` | `method, route, status`
   HTTP request processing time
 
