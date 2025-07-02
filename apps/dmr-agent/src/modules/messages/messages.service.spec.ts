@@ -10,17 +10,44 @@ import {
 } from '@dmr/shared';
 import { HttpService } from '@nestjs/axios';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { BadGatewayException, GatewayTimeoutException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as classTransformer from 'class-transformer';
 import * as classValidator from 'class-validator';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentConfig, AgentConfig } from '../../common/config';
+import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 import { MessagesService } from './messages.service';
-import { BadGatewayException, BadRequestException, GatewayTimeoutException } from '@nestjs/common';
 
-describe('AgentsService', () => {
+const mockCounter = {
+  inc: vi.fn(),
+};
+
+const mockGauge = {
+  inc: vi.fn(),
+  dec: vi.fn(),
+};
+
+const mockHistogram = {
+  observe: vi.fn(),
+  startTimer: vi.fn(() => vi.fn()),
+};
+
+const mockMetricService = {
+  httpRequestTotalCounter: mockCounter,
+  httpErrorsTotalCounter: mockCounter,
+  httpRequestDurationSecondsHistogram: mockCounter,
+  errorsTotalCounter: mockCounter,
+  activeConnectionStatusGauge: mockGauge,
+  eventsReceivedTotalCounter: mockCounter,
+  eventsSentTotalCounter: mockCounter,
+  socketConnectionDurationSecondsHistogram: mockHistogram,
+  messageProcessingDurationSecondsHistogram: mockHistogram,
+};
+
+describe('MessageService', () => {
   let service: MessagesService;
   let websocketService: WebsocketService;
   let cacheManager: Cache;
@@ -80,6 +107,7 @@ describe('AgentsService', () => {
             post: vi.fn().mockReturnValue(of({ data: {} })),
           },
         },
+        { provide: MetricService, useValue: mockMetricService },
       ],
     }).compile();
 
@@ -155,10 +183,31 @@ describe('AgentsService', () => {
   });
 
   const encryptedPayload = 'encrypted-payload';
-  const decryptedPayload = { data: ['decrypted'] };
+  const decryptedPayload = { data: { content: 'decrypted payload' } };
 
   describe('encryptMessagePayloadFromExternalService', () => {
-    it('should return encrypted message if recipient is found', async () => {
+    const validChatPayload = {
+      chat: {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        endUserFirstName: 'John',
+        created: '2023-01-01T12:00:00.000Z',
+      },
+      messages: [
+        {
+          id: '123e4567-e89b-12d3-a456-426614174001',
+          chatId: '123e4567-e89b-12d3-a456-426614174000',
+          content: 'Hello world',
+          authorTimestamp: '2023-01-01T12:00:00.000Z',
+          authorFirstName: 'John',
+          authorRole: 'user',
+          forwardedByUser: 'system',
+          forwardedFromCsa: 'csa1',
+          forwardedToCsa: 'csa2',
+        },
+      ],
+    };
+
+    it('should return encrypted message if recipient is found with new payload structure', async () => {
       const mockRecipient = {
         id: 'recipient-id',
         authenticationCertificate: 'mock-recipient-key',
@@ -167,10 +216,12 @@ describe('AgentsService', () => {
       vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockRecipient);
       vi.spyOn(Utils, 'encryptPayload').mockResolvedValueOnce(encryptedPayload);
 
-      const message = {
+      const message: ExternalServiceMessageDto = {
         id: 'test-message-id',
-        payload: ['some-data'],
         recipientId: mockRecipient.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+        type: MessageType.ChatMessage,
+        payload: validChatPayload,
       };
 
       const result = await service.encryptMessagePayloadFromExternalService(message);
@@ -182,19 +233,52 @@ describe('AgentsService', () => {
           payload: encryptedPayload,
           recipientId: mockRecipient.id,
           senderId: agentConfigMock.id,
-          timestamp: expect.any(String),
+          timestamp: message.timestamp, // Should use timestamp from incoming message
         }),
       );
+
+      // Verify that the payload was passed directly to encryption
+      expect(Utils.encryptPayload).toHaveBeenCalledWith(
+        validChatPayload,
+        agentConfigMock.privateKey,
+        mockRecipient.authenticationCertificate,
+      );
+    });
+
+    it('should use the message type from the incoming message', async () => {
+      const mockRecipient = {
+        id: 'recipient-id',
+        authenticationCertificate: 'mock-recipient-key',
+      };
+
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockRecipient);
+      vi.spyOn(Utils, 'encryptPayload').mockResolvedValueOnce(encryptedPayload);
+
+      const message: ExternalServiceMessageDto = {
+        id: 'test-message-id',
+        recipientId: mockRecipient.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+        type: MessageType.ChatMessage,
+        payload: validChatPayload,
+      };
+
+      const result = await service.encryptMessagePayloadFromExternalService(message);
+
+      expect(result?.type).toBe(MessageType.ChatMessage);
     });
 
     it('should return null if recipient is not found', async () => {
       vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(null);
 
-      const result = await service.encryptMessagePayloadFromExternalService({
+      const message: ExternalServiceMessageDto = {
         id: 'test-message-id',
-        payload: ['data'],
-        recipientId: 'invalid',
-      });
+        recipientId: 'invalid-recipient-id',
+        timestamp: '2023-01-01T12:00:00.000Z',
+        type: MessageType.ChatMessage,
+        payload: validChatPayload,
+      };
+
+      const result = await service.encryptMessagePayloadFromExternalService(message);
 
       expect(result).toBeNull();
     });
@@ -208,11 +292,15 @@ describe('AgentsService', () => {
       vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockRecipient);
       vi.spyOn(Utils, 'encryptPayload').mockRejectedValueOnce(new Error('Test Error'));
 
-      const result = await service.encryptMessagePayloadFromExternalService({
+      const message: ExternalServiceMessageDto = {
         id: 'test-message-id',
-        payload: ['data'],
         recipientId: 'recipient-id',
-      });
+        timestamp: '2023-01-01T12:00:00.000Z',
+        type: MessageType.ChatMessage,
+        payload: validChatPayload,
+      };
+
+      const result = await service.encryptMessagePayloadFromExternalService(message);
 
       expect(result).toBeNull();
     });
@@ -327,10 +415,29 @@ describe('AgentsService', () => {
   });
 
   describe('sendEncryptedMessageToServer', () => {
-    const mockMessage = {
+    const mockMessage: ExternalServiceMessageDto = {
       id: 'test-message-id',
       recipientId: 'recipient-id',
-      payload: ['some-data'],
+      timestamp: '2023-01-01T12:00:00.000Z',
+      type: MessageType.ChatMessage,
+      payload: {
+        chat: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          created: '2023-01-01T12:00:00.000Z',
+        },
+        messages: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174001',
+            chatId: '123e4567-e89b-12d3-a456-426614174000',
+            authorTimestamp: '2023-01-01T12:00:00.000Z',
+            authorFirstName: 'John',
+            authorRole: 'user',
+            forwardedByUser: 'system',
+            forwardedFromCsa: 'csa1',
+            forwardedToCsa: 'csa2',
+          },
+        ],
+      },
     };
 
     const mockEncryptedMessage = {
@@ -536,7 +643,32 @@ describe('AgentsService', () => {
       const complexMessage: ExternalServiceMessageDto = {
         id: 'complex-message-id',
         recipientId: 'recipient-123',
-        payload: ['payload'],
+        timestamp: '2023-01-01T12:00:00.000Z',
+        type: MessageType.ChatMessage,
+        payload: {
+          chat: {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            endUserFirstName: 'Jane',
+            endUserLastName: 'Smith',
+            created: '2023-01-01T12:00:00.000Z',
+            endUserEmail: 'jane@example.com',
+          },
+          messages: [
+            {
+              id: '123e4567-e89b-12d3-a456-426614174001',
+              chatId: '123e4567-e89b-12d3-a456-426614174000',
+              content: 'Complex message content',
+              authorTimestamp: '2023-01-01T12:00:00.000Z',
+              authorFirstName: 'Jane',
+              authorLastName: 'Smith',
+              authorRole: 'customer',
+              forwardedByUser: 'system',
+              forwardedFromCsa: 'csa1',
+              forwardedToCsa: 'csa2',
+              event: 'message_sent',
+            },
+          ],
+        },
       };
 
       const complexEncryptedMessage = {
@@ -560,6 +692,255 @@ describe('AgentsService', () => {
         AgentEventNames.MESSAGE_TO_DMR_SERVER,
         complexEncryptedMessage,
       );
+    });
+  });
+
+  describe('handleMessageFromDMRServerEvent with new payload structure', () => {
+    it('should parse decrypted payload back to structured format', async () => {
+      const mockSender = {
+        id: 'sender-id',
+        authenticationCertificate: 'mock-cert',
+      };
+
+      const originalPayload = {
+        chat: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          created: '2023-01-01T12:00:00.000Z',
+        },
+        messages: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174001',
+            chatId: '123e4567-e89b-12d3-a456-426614174000',
+            authorTimestamp: '2023-01-01T12:00:00.000Z',
+            authorFirstName: 'John',
+            authorRole: 'user',
+            forwardedByUser: 'system',
+            forwardedFromCsa: 'csa1',
+            forwardedToCsa: 'csa2',
+          },
+        ],
+      };
+
+      const message = {
+        id: 'msg-1',
+        type: MessageType.ChatMessage,
+        payload: 'encrypted-payload',
+        senderId: mockSender.id,
+        recipientId: agentConfigMock.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+      };
+
+      const decryptedMessage = {
+        id: 'msg-1',
+        type: MessageType.ChatMessage,
+        payload: originalPayload, // Payload is the original object
+        senderId: mockSender.id,
+        recipientId: agentConfigMock.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+      };
+
+      const ackCbSpy = vi.fn();
+
+      vi.spyOn(service as any, 'decryptMessagePayloadFromDMRServer').mockResolvedValueOnce(
+        decryptedMessage,
+      );
+      vi.spyOn(service as any, 'handleOutgoingMessage').mockResolvedValueOnce(true);
+
+      await (service as any).handleMessageFromDMRServerEvent(message, ackCbSpy);
+
+      expect(service['handleOutgoingMessage']).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: message.id,
+          recipientId: message.recipientId,
+          timestamp: message.timestamp,
+          type: message.type,
+          payload: originalPayload, // Should be the original object
+        }),
+      );
+
+      expect(ackCbSpy).toHaveBeenCalledWith({ status: SocketAckStatus.OK });
+    });
+
+    it('should handle decryption failures', async () => {
+      const message = {
+        id: 'msg-1',
+        type: MessageType.ChatMessage,
+        payload: 'encrypted-payload',
+        senderId: 'sender-id',
+        recipientId: agentConfigMock.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+      };
+
+      const ackCbSpy = vi.fn();
+
+      vi.spyOn(service as any, 'decryptMessagePayloadFromDMRServer').mockResolvedValueOnce(null);
+
+      await (service as any).handleMessageFromDMRServerEvent(message, ackCbSpy);
+
+      expect(ackCbSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: SocketAckStatus.ERROR,
+          errors: expect.arrayContaining([
+            expect.objectContaining({
+              type: ValidationErrorType.DECRYPTION_FAILED,
+              message: 'Failed to decrypt message from DMR Server',
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should handle delivery failures', async () => {
+      const mockSender = {
+        id: 'sender-id',
+        authenticationCertificate: 'mock-cert',
+      };
+
+      const message = {
+        id: 'msg-1',
+        type: MessageType.ChatMessage,
+        payload: 'encrypted-payload',
+        senderId: 'sender-id',
+        recipientId: agentConfigMock.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+      };
+
+      const originalPayload = {
+        chat: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          created: '2023-01-01T12:00:00.000Z',
+        },
+        messages: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174001',
+            chatId: '123e4567-e89b-12d3-a456-426614174000',
+            authorTimestamp: '2023-01-01T12:00:00.000Z',
+            authorFirstName: 'John',
+            authorRole: 'user',
+            forwardedByUser: 'system',
+            forwardedFromCsa: 'csa1',
+            forwardedToCsa: 'csa2',
+          },
+        ],
+      };
+
+      const decryptedMessage = {
+        id: 'msg-1',
+        type: MessageType.ChatMessage,
+        payload: originalPayload, // Payload is the original object
+        senderId: mockSender.id,
+        recipientId: agentConfigMock.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+      };
+
+      const ackCbSpy = vi.fn();
+
+      vi.spyOn(service as any, 'decryptMessagePayloadFromDMRServer').mockResolvedValueOnce(
+        decryptedMessage,
+      );
+      vi.spyOn(service as any, 'handleOutgoingMessage').mockResolvedValueOnce(false);
+
+      await (service as any).handleMessageFromDMRServerEvent(message, ackCbSpy);
+
+      expect(ackCbSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: SocketAckStatus.ERROR,
+          errors: expect.arrayContaining([
+            expect.objectContaining({
+              type: ValidationErrorType.DELIVERY_FAILED,
+              message: 'Failed to deliver message to External Service',
+            }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  describe('Direct payload encryption', () => {
+    it('should encrypt complex payload objects directly without serialization', async () => {
+      const mockRecipient = {
+        id: 'recipient-id',
+        authenticationCertificate: 'mock-recipient-key',
+      };
+
+      const complexPayload = {
+        chat: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          endUserFirstName: 'John',
+          endUserLastName: 'Doe',
+          created: '2023-01-01T12:00:00.000Z',
+          endUserEmail: 'john@example.com',
+          endUserPhone: '+1234567890',
+        },
+        messages: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174001',
+            chatId: '123e4567-e89b-12d3-a456-426614174000',
+            content: 'Hello world',
+            authorTimestamp: '2023-01-01T12:00:00.000Z',
+            authorFirstName: 'John',
+            authorLastName: 'Doe',
+            authorRole: 'customer',
+            forwardedByUser: 'system',
+            forwardedFromCsa: 'csa1',
+            forwardedToCsa: 'csa2',
+            event: 'message_sent',
+            created: '2023-01-01T12:00:00.000Z',
+          },
+          {
+            id: '123e4567-e89b-12d3-a456-426614174002',
+            chatId: '123e4567-e89b-12d3-a456-426614174000',
+            content: 'Second message',
+            authorTimestamp: '2023-01-01T12:01:00.000Z',
+            authorFirstName: 'Agent',
+            authorRole: 'agent',
+            forwardedByUser: 'system',
+            forwardedFromCsa: 'csa1',
+            forwardedToCsa: 'csa2',
+          },
+        ],
+      };
+
+      vi.spyOn(service as any, 'getAgentById').mockResolvedValueOnce(mockRecipient);
+      vi.spyOn(Utils, 'encryptPayload').mockResolvedValueOnce(encryptedPayload);
+
+      const message: ExternalServiceMessageDto = {
+        id: 'test-message-id',
+        recipientId: mockRecipient.id,
+        timestamp: '2023-01-01T12:00:00.000Z',
+        type: MessageType.ChatMessage,
+        payload: complexPayload,
+      };
+
+      await service.encryptMessagePayloadFromExternalService(message);
+
+      // Verify that Utils.encryptPayload was called directly with the payload object
+      expect(Utils.encryptPayload).toHaveBeenCalledWith(
+        complexPayload,
+        agentConfigMock.privateKey,
+        mockRecipient.authenticationCertificate,
+      );
+    });
+  });
+
+  describe('ValidationPipe Integration', () => {
+    it('should demonstrate that ValidationPipe works with ExternalServiceMessageDto', () => {
+      const validMessage = {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        recipientId: '123e4567-e89b-12d3-a456-426614174001',
+        timestamp: '2023-01-01T12:00:00.000Z',
+        type: MessageType.ChatMessage,
+        payload: {
+          chat: {
+            id: '123e4567-e89b-12d3-a456-426614174002',
+            created: '2023-01-01T12:00:00.000Z',
+          },
+          messages: [],
+        },
+      };
+
+      expect(validMessage.type).toBe(MessageType.ChatMessage);
+      expect(validMessage.payload.chat.id).toBe('123e4567-e89b-12d3-a456-426614174002');
     });
   });
 });

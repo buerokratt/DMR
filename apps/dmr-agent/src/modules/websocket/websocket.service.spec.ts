@@ -2,7 +2,8 @@ import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
-import { agentConfig, dmrServerConfig, webSocketConfig } from '../../common/config';
+import { agentConfig, webSocketConfig } from '../../common/config';
+import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from './websocket.service';
 
 vi.mock('socket.io-client', () => ({
@@ -12,11 +13,40 @@ vi.mock('socket.io-client', () => ({
 const mockJwtSign = vi.fn();
 const mockSocket = {
   on: vi.fn(),
+  onAny: vi.fn(),
+  onAnyOutgoing: vi.fn(),
   disconnect: vi.fn(),
+  removeAllListeners: vi.fn(),
   auth: {},
   connected: true,
   id: 'test-socket-id',
   recovered: false,
+};
+
+const mockCounter = {
+  inc: vi.fn(),
+};
+
+const mockGauge = {
+  inc: vi.fn(),
+  dec: vi.fn(),
+};
+
+const mockHistogram = {
+  observe: vi.fn(),
+  startTimer: vi.fn(() => vi.fn()),
+};
+
+const mockMetricService = {
+  httpRequestTotalCounter: mockCounter,
+  httpErrorsTotalCounter: mockCounter,
+  httpRequestDurationSecondsHistogram: mockCounter,
+  errorsTotalCounter: mockCounter,
+  activeConnectionStatusGauge: mockGauge,
+  eventsReceivedTotalCounter: mockCounter,
+  eventsSentTotalCounter: mockCounter,
+  socketConnectionDurationSecondsHistogram: mockHistogram,
+  messageProcessingDurationSecondsHistogram: mockHistogram,
 };
 
 describe('WebsocketService', () => {
@@ -35,20 +65,20 @@ describe('WebsocketService', () => {
           },
         },
         {
-          provide: dmrServerConfig.KEY,
-          useValue: { webSocketURL: 'http://localhost:3000' },
-        },
-        {
           provide: webSocketConfig.KEY,
           useValue: {
             reconnectionDelayMin: 1000,
             reconnectionDelayMax: 5000,
+            url: 'http://localhost:3000',
+            namespace: 'namespace',
+            messageDeliveryTimeoutMs: 2000,
           },
         },
         {
           provide: JwtService,
           useValue: { sign: vi.fn() },
         },
+        { provide: MetricService, useValue: mockMetricService },
       ],
     }).compile();
 
