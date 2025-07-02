@@ -1,0 +1,68 @@
+{
+  "name": "external-a",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/tests/external-a/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "e2e": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/apps/tests/external-a"],
+      "options": {
+        "passWithNoTests": true,
+        "reportsDirectory": "../../coverage/apps/tests/external-a",
+        "config": "apps/tests/external-a/vitest.config.e2e.mts"
+      }
+    },
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "platform": "node",
+        "outputPath": "dist/apps/tests/external-a",
+        "format": ["cjs"],
+        "bundle": false,
+        "main": "apps/tests/external-a/src/main.ts",
+        "tsConfig": "apps/tests/external-a/tsconfig.app.json",
+        "assets": ["apps/tests/external-a/src/assets"],
+        "generatePackageJson": true,
+        "esbuildOptions": {
+          "sourcemap": true,
+          "outExtension": {
+            ".js": ".js"
+          }
+        }
+      },
+      "configurations": {
+        "development": {},
+        "production": {
+          "esbuildOptions": {
+            "sourcemap": false,
+            "outExtension": {
+              ".js": ".js"
+            }
+          }
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "external-a:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "external-a:build:development"
+        },
+        "production": {
+          "buildTarget": "external-a:build:production"
+        }
+      }
+    }
+  }
+}
