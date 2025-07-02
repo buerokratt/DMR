@@ -1,4 +1,4 @@
-const dmr_socket_connection_status = 'dmr_socket_connection_status';
+const dmr_socket_connection_active = 'dmr_socket_connection_active';
 const dmr_http_requests_total = 'dmr_http_requests_total';
 const dmr_http_request_duration_seconds = 'dmr_http_request_duration_seconds';
 const dmr_http_errors_total = 'dmr_http_errors_total';
@@ -9,8 +9,8 @@ const dmr_socket_events_sent_total = 'dmr_socket_events_sent_total';
 const dmr_message_processing_duration_seconds = 'dmr_message_processing_duration_seconds';
 
 export const Metrics = {
-  dmrSocketConnectionStatus: dmr_socket_connection_status,
-  dmrSocketConnectionStatusHelp: dmr_socket_connection_status + '_help',
+  dmrSocketConnectionActive: dmr_socket_connection_active,
+  dmrSocketConnectionActiveHelp: dmr_socket_connection_active + '_help',
   dmrHttpRequestTotal: dmr_http_requests_total,
   dmrHttpRequestTotalHelp: dmr_http_requests_total + '_help',
   dmrHttpErrorsTotal: dmr_http_errors_total,

@@ -19,8 +19,8 @@ import { Metrics } from './metrics';
   providers: [
     MetricService,
     makeGaugeProvider({
-      name: Metrics.dmrSocketConnectionStatus,
-      help: Metrics.dmrSocketConnectionStatusHelp,
+      name: Metrics.dmrSocketConnectionActive,
+      help: Metrics.dmrSocketConnectionActiveHelp,
     }),
     makeCounterProvider({
       name: Metrics.dmrHttpRequestTotal,

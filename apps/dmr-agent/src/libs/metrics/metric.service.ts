@@ -14,7 +14,7 @@ export class MetricService {
     private readonly _httpRequestDurationSecondsHistogram: Histogram<string>,
     @InjectMetric(Metrics.dmrSocketErrorsTotal)
     private readonly _errorsTotalCounter: Counter<string>,
-    @InjectMetric(Metrics.dmrSocketConnectionStatus)
+    @InjectMetric(Metrics.dmrSocketConnectionActive)
     private readonly _activeConnectionStatusGauge: Gauge<string>,
     @InjectMetric(Metrics.dmrSocketEventsReceivedTotal)
     private readonly _eventsReceivedTotalCounter: Counter<string>,

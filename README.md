@@ -150,7 +150,7 @@ List of metrics:
 - **`dmr_http_errors_total` | `counter`** | `method, route`
   Count of error responses (4xx/5xx)
 
-- **`dmr_agent_socket_connection_status `** | `gauge`
+- **`dmr_agent_socket_connection_active `** | `gauge`
   Current number of active Socket.IO connections
 
 - **`dmr_socket_connection_duration_seconds`** | `histogram`
@@ -177,7 +177,7 @@ groups:
   - name: dmr-agent-alerts
     rules:
       - alert: MultipleSocketConnections
-        expr: dmr_agent_socket_connection_status > 1
+        expr: dmr_agent_socket_connection_active > 1
         for: 1m
         labels:
           severity: warning
@@ -187,7 +187,7 @@ groups:
             DMR Agent is expected to maintain only 1 WebSocket connection. Found {{ $value }}.
 
       - alert: SocketDisconnected
-        expr: dmr_agent_socket_connection_status == 0
+        expr: dmr_agent_socket_connection_active == 0
         for: 2m
         labels:
           severity: critical
