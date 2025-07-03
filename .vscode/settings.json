@@ -2,5 +2,5 @@
   "editor.codeActionsOnSave": {
     "source.organizeImports": "explicit"
   },
-  "cSpell.words": ["keyid"]
+  "cSpell.words": ["keyid", "nsps"]
 }

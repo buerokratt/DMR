@@ -6,6 +6,7 @@ import {
   SocketAckResponse,
   SocketAckStatus,
   ValidationErrorDto,
+  ValidationErrorType,
 } from '@dmr/shared';
 import {
   BadRequestException,
@@ -35,7 +36,7 @@ import { CentOpsConfigurationDifference } from '../centops/interfaces/cent-ops-c
 import { MessageValidatorService } from './message-validator.service';
 
 @WebSocketGateway({
-  namespace: '/v1/dmr-agent-events',
+  namespace: String(process.env.WEB_SOCKET_NAMESPACE ?? '/v1/dmr-agent-events'),
   connectionStateRecovery: {
     maxDisconnectionDuration: Number(process.env.WEB_SOCKET_MAX_DISCONNECTION_DURATION || '120000'),
     skipMiddlewares: true,
@@ -48,18 +49,17 @@ export class AgentGateway
   server!: Server;
 
   private readonly logger = new Logger(AgentGateway.name);
-  private originalEmit: Server['emit'];
   private handleConnectionEvent: (socket: Socket) => void = () => null;
 
   constructor(
-    private readonly authService: AuthService,
     @Inject(forwardRef(() => RabbitMQService))
     private readonly rabbitService: RabbitMQService,
-    private readonly messageValidator: MessageValidatorService,
     @Inject(forwardRef(() => RabbitMQMessageService))
     private readonly rabbitMQMessageService: RabbitMQMessageService,
+    private readonly messageValidator: MessageValidatorService,
     private readonly centOpsService: CentOpsService,
     private readonly metricService: MetricService,
+    private readonly authService: AuthService,
   ) {}
 
   onModuleInit() {
@@ -73,32 +73,35 @@ export class AgentGateway
         if (!ignored.includes(event)) {
           this.metricService.eventsReceivedTotalCounter.inc({
             event,
-            namespace: this.server.of.name,
+            namespace: socket.nsp.name,
           });
         }
       });
 
       socket.onAnyOutgoing((event: string) => {
-        this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: socket.nsp.name });
       });
     };
 
     this.server.on('connection', this.handleConnectionEvent);
 
-    const emit = (event: string, ...arguments_: unknown[]) => {
-      this.metricService.eventsSentTotalCounter.inc({ event, namespace: this.server.of.name });
+    const originalServerEmit = this.server.emit.bind(this.server) as Server['emit'];
 
-      return Server.prototype.emit.call(this.server, event, ...arguments_) as boolean;
+    const serverEmit: Server['emit'] = (event: string, ...arguments_: unknown[]) => {
+      const sockets = this.server.sockets as unknown as Map<string, Socket>;
+
+      for (const socket of [...sockets.values()]) {
+        this.metricService.eventsSentTotalCounter.inc({ event, namespace: socket.nsp.name });
+      }
+
+      return originalServerEmit(event, arguments_);
     };
 
-    this.server.emit = emit;
+    this.server.emit = serverEmit;
   }
 
   onModuleDestroy() {
     this.server.off('connection', this.handleConnectionEvent);
-    if (this.originalEmit) {
-      this.server.emit = this.originalEmit;
-    }
   }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {
@@ -120,9 +123,20 @@ export class AgentGateway
         await this.rabbitService.unsubscribe(jwtPayload.sub);
       }
 
+      const queueSetup = await this.rabbitService.setupQueue(jwtPayload.sub);
+      if (!queueSetup) {
+        this.logger.error(`Failed to set up queue for agent ${jwtPayload.sub}`, 'AgentGateway');
+        client.disconnect();
+        return;
+      }
+
       const consume = await this.rabbitService.subscribe(jwtPayload.sub);
 
       if (!consume) {
+        this.logger.error(
+          `Failed to subscribe to queue for agent ${jwtPayload.sub}`,
+          'AgentGateway',
+        );
         client.disconnect();
         return;
       }
@@ -132,8 +146,12 @@ export class AgentGateway
 
       this.metricService.activeConnectionGauge.inc(1);
       this.metricService.connectionsTotalCounter.inc(1);
-    } catch {
-      this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error during agent socket connection: ${client.id} - ${errorMessage}`,
+        'AgentGateway',
+      );
       client.disconnect();
     }
   }
@@ -171,9 +189,10 @@ export class AgentGateway
   ): Promise<ISocketAckPayload | null> {
     try {
       const socket = this.findSocketByAgentId(agentId);
+
       if (!socket) {
         this.logger.warn(`No connected socket found for agent ${agentId}`);
-        return;
+        return null;
       }
 
       const response = (await socket.emitWithAck(
@@ -182,11 +201,15 @@ export class AgentGateway
       )) as ISocketAckPayload;
 
       if (response.status === SocketAckStatus.ERROR) {
-        await this.rabbitMQMessageService.sendValidationFailure(
-          message,
-          response.errors,
-          message.receivedAt ?? new Date().toISOString(),
-        );
+        const errorTypes = response.errors.map((error) => error.type);
+
+        if (errorTypes.includes(ValidationErrorType.DELIVERY_FAILED)) {
+          await this.rabbitMQMessageService.sendValidationFailure(
+            message,
+            response.errors,
+            message.receivedAt ?? new Date().toISOString(),
+          );
+        }
       }
 
       this.logger.log(`Message forwarded to agent ${agentId} (Socket ID: ${socket.id})`);
@@ -200,7 +223,10 @@ export class AgentGateway
   }
 
   private findSocketByAgentId(agentId: string): Socket | null {
-    const connectedSockets = this.server.sockets.sockets;
+    const connectedSockets = this.server?.sockets?.sockets;
+    if (!connectedSockets) {
+      return null;
+    }
     for (const [, socket] of connectedSockets.entries()) {
       if (socket.agent?.sub === agentId) {
         return socket;

@@ -1,7 +1,7 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseInterceptors } from '@nestjs/common';
-import { MessagesService } from './messages.service';
 import { ExternalServiceMessageDto } from '@dmr/shared';
+import { Body, Controller, HttpCode, HttpStatus, Post, UseInterceptors } from '@nestjs/common';
 import { TimeoutInterceptor } from '../../common/interceptors/timeout.interceptor';
+import { MessagesService } from './messages.service';
 
 @Controller({ path: 'messages', version: '1' })
 @UseInterceptors(TimeoutInterceptor)
@@ -10,7 +10,7 @@ export class MessagesController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  sendMessage(@Body() data: ExternalServiceMessageDto): Promise<void> {
-    return this.messagesService.sendEncryptedMessageToServer(data);
+  async sendMessage(@Body() message: ExternalServiceMessageDto): Promise<void> {
+    return this.messagesService.sendEncryptedMessageToServer(message);
   }
 }

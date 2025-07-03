@@ -6,7 +6,7 @@ export const decryptPayload = async (
   jwe: string,
   senderPublicKeyString: string,
   recipientPrivateKeyString: string,
-): Promise<{ data: string[] }> => {
+): Promise<{ data: unknown }> => {
   // Load recipient's private key (for encryption)
   const recipientPrivateKey = await importPKCS8(recipientPrivateKeyString, 'RSA-OAEP');
 
@@ -18,7 +18,7 @@ export const decryptPayload = async (
   const senderPublicKey = await importSPKI(senderPublicKeyString, 'RS256');
 
   // Verify signature and extract payload
-  const { payload } = await jwtVerify<{ data: string[] }>(signedJWT, senderPublicKey);
+  const { payload } = await jwtVerify<{ data: unknown }>(signedJWT, senderPublicKey);
 
   return payload;
 };
