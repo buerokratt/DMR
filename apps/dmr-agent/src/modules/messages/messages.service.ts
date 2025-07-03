@@ -59,44 +59,42 @@ export class MessagesService implements OnModuleInit {
       return;
     }
 
-    socket.on('connect', () => {
-      // Socket.io automatically wraps the emitted data in an array
-      // So the type here is an array of arrays, ClientConfigDto[][]
-      socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: ClientConfigDto[][]) => {
-        const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
-          event: AgentEventNames.FULL_AGENT_LIST,
-        });
-
-        await this.handleFullAgentListEvent(data[0]);
-
-        endTimer();
+    // Socket.io automatically wraps the emitted data in an array
+    // So the type here is an array of arrays, ClientConfigDto[][]
+    socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: ClientConfigDto[][]) => {
+      const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+        event: AgentEventNames.FULL_AGENT_LIST,
       });
 
-      socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgent[][]) => {
-        const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
-          event: AgentEventNames.PARTIAL_AGENT_LIST,
-        });
+      await this.handleFullAgentListEvent(data[0]);
 
-        await this.handlePartialAgentListEvent(data[0]);
-
-        endTimer();
-      });
-
-      socket.on(
-        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-        async (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
-          const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
-            event: AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-          });
-
-          await this.handleMessageFromDMRServerEvent(data, ackCb);
-
-          endTimer();
-        },
-      );
-
-      this.logger.log('Successfully set up socket event listeners for agent events.');
+      endTimer();
     });
+
+    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgent[][]) => {
+      const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+        event: AgentEventNames.PARTIAL_AGENT_LIST,
+      });
+
+      await this.handlePartialAgentListEvent(data[0]);
+
+      endTimer();
+    });
+
+    socket.on(
+      AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+      async (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+        const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+          event: AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+        });
+
+        await this.handleMessageFromDMRServerEvent(data, ackCb);
+
+        endTimer();
+      },
+    );
+
+    this.logger.log('Successfully set up socket event listeners for agent events.');
   }
 
   private async handleFullAgentListEvent(data: ClientConfigDto[]): Promise<void> {
