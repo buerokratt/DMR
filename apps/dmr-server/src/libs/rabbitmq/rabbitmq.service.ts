@@ -201,8 +201,6 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   // Do not use, may break the connection.
   async checkQueue(queueName: string): Promise<boolean> {
-    const channel = this.channel;
-
     try {
       const base64 = Buffer.from(
         `${this.rabbitMQConfig.username}:${this.rabbitMQConfig.password}`,
