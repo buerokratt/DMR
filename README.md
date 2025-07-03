@@ -69,6 +69,14 @@ graph TD
 - Supports RabbitMQ clustering for scalability.
 - https://www.rabbitmq.com/kubernetes/operator/operator-monitoring
 
+## RabbitMQ
+
+### Kubernetes
+
+- [Using the RabbitMQ Cluster Kubernetes Operator](https://www.rabbitmq.com/kubernetes/operator/using-operator)
+- Supports declaratively deploy and manage RabbitMQ clusters on Kubernetes
+- Simplifies setup, scaling, and enables native support for Prometheus metrics via ServiceMonitor resources.
+
 ## Prometheus
 
 ### DMR server
