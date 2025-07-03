@@ -249,7 +249,6 @@ export class MessagesService {
   async getAgentById(id: string): Promise<IAgent | null> {
     try {
       const agents: IAgent[] = (await this.cacheManager.get<IAgent[]>(this.AGENTS_CACHE_KEY)) ?? [];
-      this.logger.log(`IGOR ALL Agents: ${JSON.stringify(agents)}`);
       return agents.find((agent) => agent.id === id) || null;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
