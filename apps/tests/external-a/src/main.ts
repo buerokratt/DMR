@@ -8,7 +8,6 @@ const port = 3001;
 const app = express();
 app.use(express.json());
 
-// eslint-disable-next-line @typescript-eslint/no-misused-promises
 app.post('/api/messages', async (_, response): Promise<void> => {
   const message = {
     id: randomUUID(),
