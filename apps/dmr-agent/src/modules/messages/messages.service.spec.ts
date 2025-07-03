@@ -3,7 +3,6 @@ import {
   ClientConfigDto,
   ExternalServiceMessageDto,
   IAgent,
-  IAgentList,
   MessageType,
   SocketAckStatus,
   Utils,
@@ -141,9 +140,7 @@ describe('MessageService', () => {
   it('should merge agents and delete marked ones on partial list event', async () => {
     cacheManager.get = vi.fn().mockResolvedValue([agent1]);
 
-    const update: IAgentList = {
-      response: [agent2, { ...agent1, deleted: true }],
-    };
+    const update: IAgent[] = [agent2, { ...agent1, deleted: true }];
 
     await (service as any).handlePartialAgentListEvent(update);
 
