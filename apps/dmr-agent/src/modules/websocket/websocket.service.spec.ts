@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { agentConfig, webSocketConfig } from '../../common/config';
 import { MetricService } from '../../libs/metrics';
+import { MessagesService } from '../messages/messages.service';
 import { WebsocketService } from './websocket.service';
 
 vi.mock('socket.io-client', () => ({
@@ -49,6 +50,10 @@ const mockMetricService = {
   messageProcessingDurationSecondsHistogram: mockHistogram,
 };
 
+const mockMessagesService = {
+  setupSocketEventListeners: vi.fn(),
+};
+
 describe('WebsocketService', () => {
   let service: WebsocketService;
   let jwtService: JwtService;
@@ -79,6 +84,7 @@ describe('WebsocketService', () => {
           useValue: { sign: vi.fn() },
         },
         { provide: MetricService, useValue: mockMetricService },
+        { provide: MessagesService, useValue: mockMessagesService },
       ],
     }).compile();
 
@@ -132,6 +138,25 @@ describe('WebsocketService', () => {
     expect(mockSocket.on).toHaveBeenCalledWith('reconnect_attempt', expect.any(Function));
     expect(mockSocket.on).toHaveBeenCalledWith('reconnect_error', expect.any(Function));
     expect(mockSocket.on).toHaveBeenCalledWith('reconnect_failed', expect.any(Function));
+  });
+
+  it('should call messagesService.setupSocketEventListeners() when socket connects', async () => {
+    service['socket'] = mockSocket as any;
+    let connectCallback: Function;
+
+    mockSocket.on.mockImplementation((event, callback) => {
+      if (event === 'connect') {
+        connectCallback = callback;
+      }
+    });
+
+    service['setupSocketEventListeners']();
+
+    expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
+
+    connectCallback();
+
+    expect(mockMessagesService.setupSocketEventListeners).toHaveBeenCalled();
   });
 
   it('isConnected() should return true when socket is connected', () => {

@@ -4,9 +4,9 @@ import {
   AgentEncryptedMessageDto,
   AgentEventNames,
   ChatMessagePayloadDto,
+  ClientConfigDto,
   ExternalServiceMessageDto,
   IAgent,
-  IAgentList,
   ISocketAckCallback,
   SocketAckResponse,
   SocketAckStatus,
@@ -21,12 +21,11 @@ import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadGatewayException,
   BadRequestException,
+  forwardRef,
   GatewayTimeoutException,
   Inject,
   Injectable,
   Logger,
-  OnModuleDestroy,
-  OnModuleInit,
 } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { AgentConfig, agentConfig } from '../../common/config';
@@ -34,29 +33,20 @@ import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
-export class MessagesService implements OnModuleInit, OnModuleDestroy {
+export class MessagesService {
   private readonly AGENTS_CACHE_KEY = 'DMR_AGENTS_LIST';
   private readonly logger = new Logger(MessagesService.name);
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    @Inject(forwardRef(() => WebsocketService))
     private readonly websocketService: WebsocketService,
     private readonly metricService: MetricService,
     private readonly httpService: HttpService,
   ) {}
 
-  onModuleInit(): void {
-    this.setupSocketEventListeners();
-  }
-
-  onModuleDestroy() {
-    const socket = this.websocketService.getSocket();
-
-    socket.removeAllListeners();
-  }
-
-  private setupSocketEventListeners(): void {
+  setupSocketEventListeners(): void {
     if (!this.websocketService.isConnected()) {
       this.logger.warn(
         'WebSocket is not connected. Will retry setting up agent event listeners when connected.',
@@ -73,22 +63,24 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: IAgentList) => {
+    // Socket.io automatically wraps the emitted data in an array
+    // So the type is an array of arrays, ClientConfigDto[][]
+    socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: ClientConfigDto[][]) => {
       const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
         event: AgentEventNames.FULL_AGENT_LIST,
       });
 
-      await this.handleFullAgentListEvent(data);
+      await this.handleFullAgentListEvent(data[0]);
 
       endTimer();
     });
 
-    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgentList) => {
+    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgent[][]) => {
       const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
         event: AgentEventNames.PARTIAL_AGENT_LIST,
       });
 
-      await this.handlePartialAgentListEvent(data);
+      await this.handlePartialAgentListEvent(data[0]);
 
       endTimer();
     });
@@ -105,25 +97,26 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
         endTimer();
       },
     );
+
+    this.logger.log(`Successfully set up socket event listeners for messages.`);
   }
 
-  private async handleFullAgentListEvent(data: IAgentList): Promise<void> {
+  private async handleFullAgentListEvent(data: ClientConfigDto[]): Promise<void> {
     try {
-      const responseItems = Array.isArray(data.response) ? data.response : [];
-      const validAgents: IAgent[] = [];
+      const validAgents: ClientConfigDto[] = [];
 
-      for (const item of responseItems) {
+      for (const item of data) {
         if (!item.id) continue;
 
-        const agentDto = plainToInstance(AgentDto, item);
-        const errors = await validate(agentDto);
+        const dto = plainToInstance(ClientConfigDto, item);
+        const errors = await validate(dto);
 
         if (errors.length > 0) {
           this.logger.error(`Validation failed for agent: ${JSON.stringify(errors)}`);
           continue;
         }
 
-        validAgents.push(agentDto);
+        validAgents.push(dto);
       }
 
       await this.cacheManager.set(this.AGENTS_CACHE_KEY, validAgents);
@@ -134,7 +127,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handlePartialAgentListEvent(data: IAgentList): Promise<void> {
+  private async handlePartialAgentListEvent(data: IAgent[]): Promise<void> {
     try {
       const currentAgents: IAgent[] =
         (await this.cacheManager.get<IAgent[]>(this.AGENTS_CACHE_KEY)) ?? [];
@@ -142,9 +135,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
       const agentMap: Map<string, IAgent> = new Map();
       currentAgents.forEach((agent: IAgent) => agentMap.set(agent.id, agent));
 
-      const responseItems = Array.isArray(data.response) ? data.response : [];
-
-      for (const item of responseItems) {
+      for (const item of data) {
         if (!item.id) continue;
 
         const agentDto = plainToInstance(AgentDto, item);
@@ -258,6 +249,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
   async getAgentById(id: string): Promise<IAgent | null> {
     try {
       const agents: IAgent[] = (await this.cacheManager.get<IAgent[]>(this.AGENTS_CACHE_KEY)) ?? [];
+      this.logger.log(`IGOR ALL Agents: ${JSON.stringify(agents)}`);
       return agents.find((agent) => agent.id === id) || null;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);

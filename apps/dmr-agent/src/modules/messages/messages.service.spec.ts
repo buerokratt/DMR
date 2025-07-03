@@ -1,5 +1,6 @@
 import {
   AgentEventNames,
+  ClientConfigDto,
   ExternalServiceMessageDto,
   IAgent,
   IAgentList,
@@ -121,16 +122,8 @@ describe('MessageService', () => {
     vi.spyOn(classValidator, 'validate').mockResolvedValue([]);
   });
 
-  it('should call setupSocketEventListeners on module init', () => {
-    const setupSpy = vi.spyOn(service as any, 'setupSocketEventListeners');
-    service.onModuleInit();
-    expect(setupSpy).toHaveBeenCalled();
-  });
-
   it('should store only valid agents from full list', async () => {
-    const data: IAgentList = {
-      response: [agent1, deletedAgent, { ...agent2, id: null } as any],
-    };
+    const data: ClientConfigDto[] = [agent1, deletedAgent, { ...agent2, id: null } as any];
 
     await (service as any).handleFullAgentListEvent(data);
 

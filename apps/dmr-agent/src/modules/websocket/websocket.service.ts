@@ -1,11 +1,19 @@
 import { JwtPayload } from '@dmr/shared';
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DefaultEventsMap } from 'socket.io';
 import { io, ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 import { AgentConfig, agentConfig } from '../../common/config/agent.config';
 import { webSocketConfig, WebSocketConfig } from '../../common/config/web-socket.config';
 import { MetricService } from '../../libs/metrics';
+import { MessagesService } from '../messages/messages.service';
 
 @Injectable()
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
@@ -18,6 +26,8 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
     @Inject(webSocketConfig.KEY) private readonly webSocketConfig: WebSocketConfig,
     private readonly jwtService: JwtService,
     private readonly metricService: MetricService,
+    @Inject(forwardRef(() => MessagesService))
+    private readonly messagesService: MessagesService,
   ) {}
 
   onModuleInit(): void {
@@ -57,6 +67,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
       this.reconnectionAttempts = 0;
 
       if (this.socket) {
+        this.messagesService.setupSocketEventListeners();
         this.logger.log(`Connected to DMR server with ID: ${this.socket.id}`);
         this.logger.log(
           `Recovery state: ${this.socket.recovered ? 'recovered' : 'new connection'}`,
@@ -144,6 +155,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   }
 
   isConnected(): boolean {
+    this.logger.log(`Socket connected: ${this.socket?.connected}`);
     return Boolean(this.socket?.connected);
   }
 
