@@ -67,11 +67,11 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
       this.reconnectionAttempts = 0;
 
       if (this.socket) {
-        this.messagesService.setupSocketEventListeners();
         this.logger.log(`Connected to DMR server with ID: ${this.socket.id}`);
         this.logger.log(
           `Recovery state: ${this.socket.recovered ? 'recovered' : 'new connection'}`,
         );
+        this.messagesService.setupSocketEventListeners();
       }
     });
 
@@ -155,7 +155,6 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   }
 
   isConnected(): boolean {
-    this.logger.log(`Socket connected: ${this.socket?.connected}`);
     return Boolean(this.socket?.connected);
   }
 
