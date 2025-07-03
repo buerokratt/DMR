@@ -140,25 +140,6 @@ describe('WebsocketService', () => {
     expect(mockSocket.on).toHaveBeenCalledWith('reconnect_failed', expect.any(Function));
   });
 
-  it('should call messagesService.setupSocketEventListeners() when socket connects', async () => {
-    service['socket'] = mockSocket as any;
-    let connectCallback: Function;
-
-    mockSocket.on.mockImplementation((event, callback) => {
-      if (event === 'connect') {
-        connectCallback = callback;
-      }
-    });
-
-    service['setupSocketEventListeners']();
-
-    expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function));
-
-    connectCallback();
-
-    expect(mockMessagesService.setupSocketEventListeners).toHaveBeenCalled();
-  });
-
   it('isConnected() should return true when socket is connected', () => {
     service['socket'] = { connected: true } as any;
     expect(service.isConnected()).toBe(true);

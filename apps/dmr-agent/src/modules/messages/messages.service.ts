@@ -21,11 +21,11 @@ import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadGatewayException,
   BadRequestException,
-  forwardRef,
   GatewayTimeoutException,
   Inject,
   Injectable,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { AgentConfig, agentConfig } from '../../common/config';
@@ -33,72 +33,70 @@ import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
-export class MessagesService {
+export class MessagesService implements OnModuleInit {
   private readonly AGENTS_CACHE_KEY = 'DMR_AGENTS_LIST';
   private readonly logger = new Logger(MessagesService.name);
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-    @Inject(forwardRef(() => WebsocketService))
     private readonly websocketService: WebsocketService,
     private readonly metricService: MetricService,
     private readonly httpService: HttpService,
   ) {}
 
-  setupSocketEventListeners(): void {
-    if (!this.websocketService.isConnected()) {
-      this.logger.warn(
-        'WebSocket is not connected. Will retry setting up agent event listeners when connected.',
-      );
-      return;
-    }
+  onModuleInit(): void {
+    this.setupSocketEventListeners();
+  }
 
+  setupSocketEventListeners(): void {
     const socket = this.websocketService.getSocket();
 
     if (!socket) {
       this.logger.error(
-        'Failed to get socket instance even though connection was reported as active',
+        'Cannot set up event listeners for agent events: Socket is not initialized',
       );
       return;
     }
 
-    // Socket.io automatically wraps the emitted data in an array
-    // So the type is an array of arrays, ClientConfigDto[][]
-    socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: ClientConfigDto[][]) => {
-      const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
-        event: AgentEventNames.FULL_AGENT_LIST,
-      });
-
-      await this.handleFullAgentListEvent(data[0]);
-
-      endTimer();
-    });
-
-    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgent[][]) => {
-      const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
-        event: AgentEventNames.PARTIAL_AGENT_LIST,
-      });
-
-      await this.handlePartialAgentListEvent(data[0]);
-
-      endTimer();
-    });
-
-    socket.on(
-      AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-      async (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+    socket.on('connect', () => {
+      // Socket.io automatically wraps the emitted data in an array
+      // So the type here is an array of arrays, ClientConfigDto[][]
+      socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: ClientConfigDto[][]) => {
         const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
-          event: AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+          event: AgentEventNames.FULL_AGENT_LIST,
         });
 
-        await this.handleMessageFromDMRServerEvent(data, ackCb);
+        await this.handleFullAgentListEvent(data[0]);
 
         endTimer();
-      },
-    );
+      });
 
-    this.logger.log(`Successfully set up socket event listeners for messages.`);
+      socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgent[][]) => {
+        const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+          event: AgentEventNames.PARTIAL_AGENT_LIST,
+        });
+
+        await this.handlePartialAgentListEvent(data[0]);
+
+        endTimer();
+      });
+
+      socket.on(
+        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+        async (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+          const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
+            event: AgentEventNames.MESSAGE_FROM_DMR_SERVER,
+          });
+
+          await this.handleMessageFromDMRServerEvent(data, ackCb);
+
+          endTimer();
+        },
+      );
+
+      this.logger.log('Successfully set up socket event listeners for agent events.');
+    });
   }
 
   private async handleFullAgentListEvent(data: ClientConfigDto[]): Promise<void> {
