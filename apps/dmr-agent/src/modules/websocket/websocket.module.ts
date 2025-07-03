@@ -12,7 +12,6 @@ import { WebsocketService } from './websocket.service';
       useFactory: (agentConfig: AgentConfig) => ({
         signOptions: {
           algorithm: 'RS256',
-          expiresIn: '1m',
           keyid: agentConfig.id,
         },
       }),

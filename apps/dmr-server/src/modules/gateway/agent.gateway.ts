@@ -123,9 +123,20 @@ export class AgentGateway
         await this.rabbitService.unsubscribe(jwtPayload.sub);
       }
 
+      const queueSetup = await this.rabbitService.setupQueue(jwtPayload.sub);
+      if (!queueSetup) {
+        this.logger.error(`Failed to set up queue for agent ${jwtPayload.sub}`, 'AgentGateway');
+        client.disconnect();
+        return;
+      }
+
       const consume = await this.rabbitService.subscribe(jwtPayload.sub);
 
       if (!consume) {
+        this.logger.error(
+          `Failed to subscribe to queue for agent ${jwtPayload.sub}`,
+          'AgentGateway',
+        );
         client.disconnect();
         return;
       }
@@ -135,8 +146,12 @@ export class AgentGateway
 
       this.metricService.activeConnectionGauge.inc(1);
       this.metricService.connectionsTotalCounter.inc(1);
-    } catch {
-      this.logger.error(`Error during agent socket connection: ${client.id}`, 'AgentGateway');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error during agent socket connection: ${client.id} - ${errorMessage}`,
+        'AgentGateway',
+      );
       client.disconnect();
     }
   }
@@ -208,7 +223,10 @@ export class AgentGateway
   }
 
   private findSocketByAgentId(agentId: string): Socket | null {
-    const connectedSockets = this.server.sockets.sockets;
+    const connectedSockets = this.server?.sockets?.sockets;
+    if (!connectedSockets) {
+      return null;
+    }
     for (const [, socket] of connectedSockets.entries()) {
       if (socket.agent?.sub === agentId) {
         return socket;

@@ -7,7 +7,7 @@ export const AGENT_CONFIG_TOKEN = Symbol('AGENT_CONFIG_TOKEN');
 const variables = Utils.validateObject(
   {
     id: String(process.env.AGENT_ID),
-    privateKey: String(process.env.AGENT_PRIVATE_KEY),
+    privateKey: String(process.env.AGENT_PRIVATE_KEY).replace(/\\n/g, '\n'),
     outgoingMessageEndpoint: String(process.env.OUTGOING_MESSAGE_ENDPOINT || ''),
   },
   {

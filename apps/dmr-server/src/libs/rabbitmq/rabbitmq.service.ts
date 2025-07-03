@@ -112,6 +112,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   async setupQueue(queueName: string, ttl?: number): Promise<boolean> {
     const channel = this.channel;
 
+    if (!channel) {
+      this.logger.error(`Cannot setup queue ${queueName}: RabbitMQ channel is not available`);
+      return false;
+    }
+
     try {
       const dlqName = this.getDLQName(queueName);
 
@@ -231,6 +236,13 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   async subscribe(queueName: string): Promise<boolean> {
     const channel = this.channel;
+
+    if (!channel) {
+      this.logger.error(
+        `Cannot subscribe to queue ${queueName}: RabbitMQ channel is not available`,
+      );
+      return false;
+    }
 
     try {
       const queueExists = await this.checkQueue(queueName);
@@ -355,11 +367,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     return this._connection;
   }
 
-  get channel(): rabbit.Channel {
+  get channel(): rabbit.Channel | null {
     if (!this._channel) {
       this.logger.warn('Rabbit channel not defined, attempting to reconnect...');
       this.scheduleReconnect();
-      return undefined;
+      return null;
     }
 
     return this._channel;
