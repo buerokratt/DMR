@@ -85,10 +85,10 @@ export class AgentGateway
 
     this.server.on('connection', this.handleConnectionEvent);
 
-    const originalServerEmit = this.server.emit.bind(this.server) as Server['emit'];
+    const originalServerEmit = this.server.emit.bind(this.server);
 
     const serverEmit: Server['emit'] = (event: string, ...arguments_: unknown[]) => {
-      const sockets = this.server.sockets as unknown as Map<string, Socket>;
+      const sockets = this.server.sockets.sockets;
 
       for (const socket of [...sockets.values()]) {
         this.metricService.eventsSentTotalCounter.inc({ event, namespace: socket.nsp.name });
@@ -201,12 +201,12 @@ export class AgentGateway
       )) as ISocketAckPayload;
 
       if (response.status === SocketAckStatus.ERROR) {
-        const errorTypes = response.errors.map((error) => error.type);
+        const errorTypes = response.errors?.map((error) => error.type) ?? [];
 
         if (errorTypes.includes(ValidationErrorType.DELIVERY_FAILED)) {
           await this.rabbitMQMessageService.sendValidationFailure(
             message,
-            response.errors,
+            response.errors ?? [],
             message.receivedAt ?? new Date().toISOString(),
           );
         }

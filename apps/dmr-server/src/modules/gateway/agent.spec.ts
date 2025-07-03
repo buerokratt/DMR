@@ -581,7 +581,7 @@ describe('AgentGateway', () => {
       );
       expect(mockRabbitMQMessageService.sendValidationFailure).toHaveBeenCalledWith(
         testMessage,
-        response.errors,
+        response?.errors ?? [],
         testMessage.receivedAt ?? '2025-06-18T14:00:00Z',
       );
       expect(mockSocket1Spy).toHaveBeenCalledWith(

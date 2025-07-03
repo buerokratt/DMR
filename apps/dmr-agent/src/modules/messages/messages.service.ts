@@ -83,12 +83,12 @@ export class MessagesService implements OnModuleInit {
 
     socket.on(
       AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-      async (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+      async (data: AgentEncryptedMessageDto, ackCallback: ISocketAckCallback) => {
         const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
           event: AgentEventNames.MESSAGE_FROM_DMR_SERVER,
         });
 
-        await this.handleMessageFromDMRServerEvent(data, ackCb);
+        await this.handleMessageFromDMRServerEvent(data, ackCallback);
 
         endTimer();
       },
@@ -160,7 +160,7 @@ export class MessagesService implements OnModuleInit {
 
   private async handleMessageFromDMRServerEvent(
     message: AgentEncryptedMessageDto,
-    ackCb: ISocketAckCallback,
+    ackCallback: ISocketAckCallback,
   ): Promise<void> {
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
@@ -168,7 +168,7 @@ export class MessagesService implements OnModuleInit {
       if (!decryptedMessage) {
         this.logger.error('Failed to decrypt message from DMR Server');
 
-        return ackCb({
+        return ackCallback({
           status: SocketAckStatus.ERROR,
           errors: [
             {
@@ -192,7 +192,7 @@ export class MessagesService implements OnModuleInit {
       if (!response) {
         this.logger.error('Failed to deliver message to External Service');
 
-        return ackCb({
+        return ackCallback({
           status: SocketAckStatus.ERROR,
           errors: [
             {
@@ -207,12 +207,12 @@ export class MessagesService implements OnModuleInit {
 
       this.logger.log('Message is decrypted');
 
-      return ackCb({ status: SocketAckStatus.OK });
+      return ackCallback({ status: SocketAckStatus.OK });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
 
-      return ackCb({
+      return ackCallback({
         status: SocketAckStatus.ERROR,
         errors: [
           {

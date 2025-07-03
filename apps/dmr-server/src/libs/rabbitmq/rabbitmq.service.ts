@@ -29,6 +29,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   private readonly logger = new Logger(RabbitMQService.name);
   private readonly RECONNECT_INTERVAL_NAME = 'RECONNECT_INTERVAL_NAME';
+  private readonly CHANNEL_NOT_AVAILABLE_ERROR = 'RabbitMQ channel is not available';
 
   constructor(
     @Inject(rabbitMQConfig.KEY)
@@ -163,6 +164,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   async setupQueueWithoutDLQ(queueName: string, ttl?: number): Promise<boolean> {
     const channel = this.channel;
 
+    if (!channel) {
+      this.logger.error(this.CHANNEL_NOT_AVAILABLE_ERROR);
+      return false;
+    }
+
     try {
       await channel.assertQueue(queueName, {
         durable: true,
@@ -188,6 +194,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
   async deleteQueue(queueName: string): Promise<boolean> {
     const channel = this.channel;
+
+    if (!channel) {
+      this.logger.error(this.CHANNEL_NOT_AVAILABLE_ERROR);
+      return false;
+    }
 
     try {
       const dlqName = this.getDLQName(queueName);
@@ -239,7 +250,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
     if (!channel) {
       this.logger.error(
-        `Cannot subscribe to queue ${queueName}: RabbitMQ channel is not available`,
+        `Cannot subscribe to queue ${queueName}: ${this.CHANNEL_NOT_AVAILABLE_ERROR}`,
       );
       return false;
     }
@@ -266,7 +277,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
           }
 
           if (result.status === SocketAckStatus.ERROR) {
-            const errorTypes = result.errors.map((error) => error.type);
+            const errorTypes = result.errors?.map((error) => error.type) ?? [];
 
             if (errorTypes.includes(ValidationErrorType.DECRYPTION_FAILED)) {
               return channel.nack(message, false, false);
@@ -329,6 +340,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   async unsubscribe(queueName: string): Promise<boolean> {
     const channel = this.channel;
     const consumeTagKey = this.getConsumeTagKey(queueName);
+
+    if (!channel) {
+      this.logger.error(this.CHANNEL_NOT_AVAILABLE_ERROR);
+      return false;
+    }
 
     try {
       const consumerTag = await this.cacheManager.get<string | null>(consumeTagKey);

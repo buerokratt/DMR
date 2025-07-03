@@ -553,7 +553,7 @@ describe('MessageService', () => {
         expect.fail('Expected GatewayTimeoutException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(GatewayTimeoutException);
-        expect(error.message).toBe('Timeout');
+        expect((error as Error).message).toBe('Timeout');
       }
     });
 
@@ -572,7 +572,7 @@ describe('MessageService', () => {
         expect.fail('Expected BadGatewayException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(BadGatewayException);
-        expect(error.message).toBe('Gateway error');
+        expect((error as Error).message).toBe('Gateway error');
       }
     });
 
@@ -592,7 +592,7 @@ describe('MessageService', () => {
         expect.fail('Expected BadGatewayException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(BadGatewayException);
-        expect(error.message).toBe('Unexpected socket error');
+        expect((error as Error).message).toBe('Unexpected socket error');
       }
     });
 
@@ -612,7 +612,7 @@ describe('MessageService', () => {
         expect.fail('Expected BadGatewayException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(BadGatewayException);
-        expect(error.message).toBe('Unexpected error sending message to DMR Server');
+        expect((error as Error).message).toBe('Unexpected error sending message to DMR Server');
       }
     });
 

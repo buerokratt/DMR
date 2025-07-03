@@ -49,7 +49,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    let startTime: number;
+    let startTime: number | undefined;
 
     this.socket.on('connect', () => {
       startTime = Date.now();
