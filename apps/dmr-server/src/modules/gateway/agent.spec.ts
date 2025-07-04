@@ -20,7 +20,8 @@ import { MessageValidatorService } from './message-validator.service';
 
 declare module 'socket.io' {
   interface Socket {
-    agent: JwtPayload;
+    jwtPayload: JwtPayload;
+    authenticationCertificate: string;
   }
 }
 
@@ -102,7 +103,8 @@ describe('AgentGateway', () => {
         xdomain: false,
       } as any,
       disconnect: vi.fn(),
-      agent: agentPayload || undefined,
+      jwtPayload: agentPayload || undefined,
+      authenticationCertificate: agentPayload ? 'mock-cert' : undefined,
       emit: vi.fn(),
       emitWithAck: vi.fn(),
       on: vi.fn(),
@@ -173,13 +175,17 @@ describe('AgentGateway', () => {
   });
 
   describe('handleConnection', () => {
-    const mockPayload = { sub: 'testAgentId', iat: 123, exp: 123, cat: 175 };
+    const mockJwtPayload = { sub: 'testAgentId', iat: 123, exp: 123, cat: 175 };
+    const mockConnectionData = {
+      jwtPayload: mockJwtPayload,
+      authenticationCertificate: 'mock-certificate',
+    };
 
     it('should allow connection and emit full agent list when consume is truthy', async () => {
       const token = 'valid.jwt.token';
       const client = createMockSocket(token);
 
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(true);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
@@ -192,7 +198,8 @@ describe('AgentGateway', () => {
       expect(centOpsService.getCentOpsConfigurations).toHaveBeenCalled();
       expect(serverMock.emit).toHaveBeenCalledWith(AgentEventNames.FULL_AGENT_LIST, ['agentA']);
       expect(client.disconnect).not.toHaveBeenCalled();
-      expect((client as any).agent).toEqual(mockPayload);
+      expect((client as any).jwtPayload).toEqual(mockJwtPayload);
+      expect((client as any).authenticationCertificate).toEqual('mock-certificate');
       expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
 
@@ -200,7 +207,7 @@ describe('AgentGateway', () => {
       const token = 'valid.jwt.token';
       const client = createMockSocket(token);
 
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(true);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(false);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
@@ -211,7 +218,7 @@ describe('AgentGateway', () => {
       expect(rabbitService.setupQueue).toHaveBeenCalledWith('testAgentId');
       expect(rabbitService.subscribe).toHaveBeenCalledWith('testAgentId');
       expect(client.disconnect).toHaveBeenCalledOnce();
-      expect((client as any).agent).toEqual(mockPayload);
+      expect((client as any).jwtPayload).toEqual(mockJwtPayload);
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         'Failed to subscribe to queue for agent testAgentId',
         'AgentGateway',
@@ -222,7 +229,7 @@ describe('AgentGateway', () => {
       const token = 'valid.jwt.token';
       const client = createMockSocket(token);
 
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(true);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(null);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
@@ -243,7 +250,7 @@ describe('AgentGateway', () => {
       expect(rabbitService.subscribe).not.toHaveBeenCalled();
       expect(client.disconnect).toHaveBeenCalledOnce();
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        `Error during agent socket connection: ${client.id} - Cannot read properties of undefined (reading 'sub')`,
+        `Error during agent socket connection: ${client.id} - Cannot read properties of undefined (reading 'jwtPayload')`,
         'AgentGateway',
       );
     });
@@ -277,7 +284,7 @@ describe('AgentGateway', () => {
       client.handshake.auth.token = undefined;
       client.handshake.headers.authorization = `Bearer ${token}`;
 
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(true);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
@@ -285,6 +292,8 @@ describe('AgentGateway', () => {
       await gateway.handleConnection(client);
 
       expect(authService.verifyToken).toHaveBeenCalledWith(token);
+      expect(rabbitService.setupQueue).toHaveBeenCalledWith('testAgentId');
+      expect(rabbitService.subscribe).toHaveBeenCalledWith('testAgentId');
       expect(serverMock.emit).toHaveBeenCalled();
     });
 
@@ -294,7 +303,7 @@ describe('AgentGateway', () => {
       const client = createMockSocket(authToken);
       client.handshake.headers.authorization = `Bearer ${headerToken}`;
 
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
 
@@ -306,7 +315,7 @@ describe('AgentGateway', () => {
     it('should disconnect if subscribe throws error', async () => {
       const token = 'valid.jwt.token';
       const client = createMockSocket(token);
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.subscribe.mockRejectedValueOnce(new Error('rabbit fail'));
 
       await gateway.handleConnection(client);
@@ -370,7 +379,10 @@ describe('AgentGateway', () => {
     it('should call subscribe with undefined sub', async () => {
       const token = 'no.sub.token';
       const client = createMockSocket(token);
-      mockAuthService.verifyToken.mockResolvedValueOnce({ iat: 1, exp: 2 } as any);
+      mockAuthService.verifyToken.mockResolvedValueOnce({
+        jwtPayload: { iat: 1, exp: 2 } as any,
+        authenticationCertificate: 'test-cert',
+      });
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(true);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce([]);
@@ -385,7 +397,7 @@ describe('AgentGateway', () => {
       const token = 'valid.jwt.token';
       const client = createMockSocket(token);
 
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(false);
 
       await gateway.handleConnection(client);
@@ -424,7 +436,7 @@ describe('AgentGateway', () => {
       (serverMock as any).setMockSockets([['existing-socket', existingSocket]]);
 
       // Setup mocks for successful authentication and subscription
-      mockAuthService.verifyToken.mockResolvedValueOnce(mockPayload);
+      mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(true);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
@@ -581,7 +593,7 @@ describe('AgentGateway', () => {
       );
       expect(mockRabbitMQMessageService.sendValidationFailure).toHaveBeenCalledWith(
         testMessage,
-        response.errors,
+        response?.errors ?? [],
         testMessage.receivedAt ?? '2025-06-18T14:00:00Z',
       );
       expect(mockSocket1Spy).toHaveBeenCalledWith(
@@ -861,6 +873,176 @@ describe('AgentGateway', () => {
         `Unexpected error processing message: Validation succeeded but no message was returned`,
       );
       expect(mockHistogram.startTimer).toHaveBeenCalled();
+    });
+  });
+
+  describe('onAgentConfigUpdate and validateActiveConnections', () => {
+    beforeEach(() => {
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]);
+      mockRabbitMQService.unsubscribe.mockResolvedValue(undefined);
+    });
+
+    it('should emit partial agent list and validate connections', async () => {
+      const mockDifference = {
+        added: [],
+        deleted: [],
+        certificateChanged: [],
+      };
+
+      const validateSpy = vi.spyOn(gateway as any, 'validateActiveConnections');
+      validateSpy.mockResolvedValue(undefined);
+
+      await gateway.onAgentConfigUpdate(mockDifference);
+
+      expect(serverMock.emit).toHaveBeenCalledWith(AgentEventNames.PARTIAL_AGENT_LIST, []);
+      expect(validateSpy).toHaveBeenCalledWith(mockDifference);
+    });
+
+    it('should disconnect agents that are no longer in the agent list', async () => {
+      const deletedAgent = { id: 'deleted-agent', authenticationCertificate: 'cert1' };
+      const mockSocket = createMockSocket('token1', { sub: 'deleted-agent' }, 'socket-1');
+      (mockSocket as any).authenticationCertificate = 'cert1';
+
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]);
+
+      const mockDifference = {
+        added: [],
+        deleted: [deletedAgent],
+        certificateChanged: [],
+      };
+
+      await (gateway as any).validateActiveConnections(mockDifference);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(mockRabbitMQService.unsubscribe).toHaveBeenCalledWith('deleted-agent');
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Dropping connection for agent deleted-agent'),
+      );
+    });
+
+    it('should disconnect agents whose certificates have changed', async () => {
+      const changedAgent = { id: 'cert-changed-agent', authenticationCertificate: 'new-cert' };
+      const mockSocket = createMockSocket('token1', { sub: 'cert-changed-agent' }, 'socket-1');
+      (mockSocket as any).authenticationCertificate = 'old-cert';
+
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([changedAgent]);
+
+      const mockDifference = {
+        added: [],
+        deleted: [],
+        certificateChanged: [changedAgent],
+      };
+
+      await (gateway as any).validateActiveConnections(mockDifference);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(mockRabbitMQService.unsubscribe).toHaveBeenCalledWith('cert-changed-agent');
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Agent certificate has been rotated/revoked'),
+      );
+    });
+
+    it('should disconnect agents not found in current configuration', async () => {
+      const mockSocket = createMockSocket('token1', { sub: 'missing-agent' }, 'socket-1');
+      // Set authenticationCertificate separately
+      (mockSocket as any).authenticationCertificate = 'some-cert';
+
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]); // Agent not in current config
+
+      const mockDifference = {
+        added: [],
+        deleted: [],
+        certificateChanged: [],
+      };
+
+      await (gateway as any).validateActiveConnections(mockDifference);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(mockRabbitMQService.unsubscribe).toHaveBeenCalledWith('missing-agent');
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Agent not found in current authorized list'),
+      );
+    });
+
+    it('should not disconnect agents with valid certificates', async () => {
+      const validAgent = { id: 'valid-agent', authenticationCertificate: 'valid-cert' };
+      const mockSocket = createMockSocket('token1', { sub: 'valid-agent' }, 'socket-1');
+      (mockSocket as any).authenticationCertificate = 'valid-cert';
+
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([validAgent]);
+
+      const mockDifference = {
+        added: [],
+        deleted: [],
+        certificateChanged: [],
+      };
+
+      await (gateway as any).validateActiveConnections(mockDifference);
+
+      expect(mockSocket.disconnect).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.unsubscribe).not.toHaveBeenCalled();
+    });
+
+    it('should handle sockets without agent information gracefully', async () => {
+      const mockSocket = createMockSocket('token1', undefined, 'socket-1');
+
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]);
+
+      const mockDifference = {
+        added: [],
+        deleted: [],
+        certificateChanged: [],
+      };
+
+      await (gateway as any).validateActiveConnections(mockDifference);
+
+      expect(mockSocket.disconnect).not.toHaveBeenCalled();
+      expect(mockRabbitMQService.unsubscribe).not.toHaveBeenCalled();
+    });
+
+    it('should handle RabbitMQ unsubscribe errors gracefully', async () => {
+      const deletedAgent = { id: 'deleted-agent', authenticationCertificate: 'cert1' };
+      const mockSocket = createMockSocket('token1', { sub: 'deleted-agent' }, 'socket-1');
+      (mockSocket as any).authenticationCertificate = 'cert1';
+
+      (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+      mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]);
+      mockRabbitMQService.unsubscribe.mockRejectedValue(new Error('Unsubscribe failed'));
+
+      const mockDifference = {
+        added: [],
+        deleted: [deletedAgent],
+        certificateChanged: [],
+      };
+
+      await (gateway as any).validateActiveConnections(mockDifference);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Error unsubscribing agent deleted-agent during security disconnect',
+        ),
+      );
+    });
+
+    it('should return early when no connected sockets exist', async () => {
+      (serverMock as any).setMockSockets([]);
+      const getCentOpsSpy = vi.spyOn(mockCentOpsService, 'getCentOpsConfigurations');
+
+      const mockDifference = {
+        added: [],
+        deleted: [],
+        certificateChanged: [],
+      };
+
+      await (gateway as any).validateActiveConnections(mockDifference);
+
+      expect(getCentOpsSpy).not.toHaveBeenCalled();
     });
   });
 });

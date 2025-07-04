@@ -59,6 +59,14 @@
       "options": {
         "lintFilePatterns": ["apps/dmr-server/**/*.ts"]
       }
+    },
+    "lint:check": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/dmr-server/**/*.ts"],
+        "maxWarnings": 0
+      }
     }
   }
 }

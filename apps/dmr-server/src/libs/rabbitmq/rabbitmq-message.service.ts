@@ -81,6 +81,12 @@ export class RabbitMQMessageService implements OnModuleInit {
     try {
       const queueName = message.recipientId;
       const channel = this.rabbitMQService.channel;
+
+      if (!channel) {
+        this.logger.error('RabbitMQ channel is not available');
+        return false;
+      }
+
       const queueExists = await this.rabbitMQService.checkQueue(queueName);
       if (!queueExists) {
         const success = await this.rabbitMQService.setupQueue(queueName);
@@ -132,6 +138,12 @@ export class RabbitMQMessageService implements OnModuleInit {
   ): Promise<boolean> {
     try {
       const channel = this.rabbitMQService.channel;
+
+      if (!channel) {
+        this.logger.error('RabbitMQ channel is not available');
+        return false;
+      }
+
       const messageId = this.extractMessageId(originalMessage);
 
       const failureMessage: SimpleValidationFailureMessage = {

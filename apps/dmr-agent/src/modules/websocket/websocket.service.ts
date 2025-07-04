@@ -49,7 +49,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    let startTime: number;
+    let startTime: number | undefined;
 
     this.socket.on('connect', () => {
       startTime = Date.now();
@@ -74,6 +74,17 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
       }
 
       this.logger.warn(`Disconnected from DMR server. Reason: ${reason}`);
+
+      if (reason === 'io server disconnect') {
+        this.logger.log('Server disconnected client, attempting manual reconnection...');
+
+        setTimeout(() => {
+          if (!this.socket?.connected) {
+            this.logger.log('Attempting to reconnect after server disconnect...');
+            this.socket?.connect();
+          }
+        }, this.webSocketConfig.reconnectionDelayMin);
+      }
     });
 
     this.socket.on('connect_error', (error: unknown) => {
