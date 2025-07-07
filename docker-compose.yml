@@ -41,7 +41,7 @@ services:
       - LOGGER_COLORS=true # Set to "false" when deployed
       - LOGGER_LOG_LEVELS=error,warn,log
       - WEB_SOCKET_MAX_DISCONNECTION_DURATION=120000
-      - CENTOPS_CONFIGURATION_URL=http://localhost:3000/centops/clients # Leave as is if using CentOps mock when deployed
+      - CENTOPS_CONFIGURATION_URL=http://localhost:3000/centops/clients # Can be any value if using CentOps mock when deployed
       - CENTOPS_CONFIGURATION_CRON_TIME=*/10 * * * * *
       - RABBITMQ_DEFAULT_PORT=5672
       - RABBITMQ_DEFAULT_HOST=rabbitmq
