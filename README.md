@@ -86,6 +86,43 @@ The main Docker Compose file is located at the root of the repository: [`docker-
 docker compose up -d
 ```
 
+### Manual testing
+
+You can test the whole flow of the solution this way:
+
+1. Install [ngrok](https://ngrok.com) and run it with `ngrok http http://localhost:8080`.
+2. Copy the URL provided by ngrok and set it as `OUTGOING_MESSAGE_ENDPOINT` for `dmr-agent-a` in `docker-compose.yml`.
+3. Run `docker compose up -d`.
+4. Run this command to send a message in [the proper format](#message-format) through `dmr-agent-b`:
+
+```bash
+curl -X POST http://localhost:8074/v1/messages \
+    -H "Content-Type: application/json" \
+    -d '{
+    "id": "b1a7e8c2-1234-4f56-9abc-1234567890ab",
+    "recipientId": "d3b07384-d9a0-4c3f-a4e2-123456789abc",
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "type": "ChatMessage",
+    "payload": {
+      "chat": {
+        "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "created": "2024-01-15T10:00:00.000Z"
+      },
+      "messages": [
+        {
+          "id": "550e8400-e29b-41d4-a716-446655440000",
+          "chatId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+          "content": "example string 2",
+          "authorTimestamp": "2024-01-15T10:30:00.000Z",
+          "authorRole": "end-user"
+        }
+      ]
+    }
+  }'
+```
+
+5. `dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You should see the message in the ngrok tunnel.
+
 ## Environment Variables
 
 Below is a list of all environment variables used by the DMR system, organized by service. Sensible variable values are also specified in the docker-compose file.
@@ -99,7 +136,7 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `LOGGER_COLORS`                               | Enable colored logs. **Strongly suggest to disable when deployed.**                                                                                                  |          | `true`                |
 | `LOGGER_LOG_LEVELS`                           | Comma-separated log levels to output                                                                                                                                 |          | `error,warn,log`      |
 | `WEB_SOCKET_MAX_DISCONNECTION_DURATION`       | Maximum duration (ms) for DMR Agent WebSocket disconnection. Used by [connection state recovery](https://socket.io/docs/v4/server-options/#connectionstaterecovery). |          | `120000` (2 minutes)  |
-| `CENTOPS_CONFIGURATION_URL`                   | URL for CentOps configuration service. **Can be set to any value when using CentOps configuration endpoint mock.**                                                   | Yes      |                       |
+| `CENTOPS_CONFIGURATION_URL`                   | URL for CentOps configuration service. **Can be set to any value when using [CentOps configuration endpoint mock](#centops-mock).**                                  | Yes      |                       |
 | `CENTOPS_CONFIGURATION_CRON_TIME`             | Cron schedule for fetching configuration (agent list) from CentOps                                                                                                   |          | `*/30 * * * *`        |
 | `RABBITMQ_DEFAULT_HOST`                       | Hostname for RabbitMQ connection                                                                                                                                     | Yes      |                       |
 | `RABBITMQ_DEFAULT_PORT`                       | Port for RabbitMQ AMQP connection                                                                                                                                    | Yes      |                       |
@@ -146,6 +183,62 @@ CentOps configuration endpoint is currently mocked in DMR Server. The following 
 | ----------------------- | ------------------------------------ | -------- |
 | `RABBITMQ_DEFAULT_USER` | Username for RabbitMQ authentication | Yes      |
 | `RABBITMQ_DEFAULT_PASS` | Password for RabbitMQ authentication | Yes      |
+
+## Sending messages
+
+DMR Agent will accept incoming messages on `/v1/messages` POST endpoint. It will forward outgoing messages to the `OUTGOING_MESSAGE_ENDPOINT`. See [DMR Agent variables](#dmr-agent-variables).
+
+Messages endpoint supports versioning. The `v1` version message JSON structure is the following. This structure closely matches the DB schema of [Chatbot module](https://github.com/buerokratt/Buerokratt-Chatbot).
+
+```json
+{
+  "id": "b1a7e8c2-1234-4f56-9abc-1234567890ab",
+  "recipientId": "d3b07384-d9a0-4c3f-a4e2-123456789abc",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "type": "ChatMessage", // For now, only ChatMessage is supported
+  "payload": {
+    "chat": {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "created": "2024-01-15T10:00:00.000Z",
+      // All fields below are optional:
+      "endUserFirstName": "Alice",
+      "endUserLastName": "Smith",
+      "endUserId": "user-123",
+      "endUserEmail": "alice@example.com",
+      "endUserPhone": "+123456789",
+      "customerSupportDisplayName": "Support Bot",
+      "endUserOs": "Windows",
+      "endUserUrl": "https://example.com"
+    },
+    "messages": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "chatId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "content": "example string 2",
+        "authorTimestamp": "2024-01-15T10:30:00.000Z",
+        "authorRole": "end-user",
+        // All fields below are optional:
+        "event": "joined",
+        "csaTitle": "Agent",
+        "authorId": "agent-123",
+        "authorFirstName": "Bob",
+        "authorLastName": "Brown",
+        "forwardedByUser": "user-456",
+        "forwardedFromCsa": "Support A",
+        "forwardedToCsa": "Support B",
+        "originalBaseId": "base-789",
+        "originalCreated": "2024-01-15T09:00:00.000Z",
+        "rating": "5",
+        "created": "2024-01-15T10:30:00.000Z",
+        "preview": "Preview text",
+        "updated": "2024-01-15T10:31:00.000Z",
+        "buttons": "[]",
+        "options": "{}"
+      }
+    ]
+  }
+}
+```
 
 ## RabbitMQ
 
