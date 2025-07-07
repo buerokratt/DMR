@@ -1,6 +1,5 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-// @ts-ignore
 import request from 'supertest';
 import { io, Socket } from 'socket.io-client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -22,7 +21,7 @@ function createMockJwtWithKidAndSub(kid: string): string {
     iat: Math.floor(Date.now() / 1000),
   };
 
-  const encode = (obj: object) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+  const encode = (object: object) => Buffer.from(JSON.stringify(object)).toString('base64url');
 
   return `${encode(header)}.${encode(payload)}.${kid}`;
 }
