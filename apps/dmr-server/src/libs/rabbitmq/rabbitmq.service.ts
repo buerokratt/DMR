@@ -53,7 +53,9 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    this.schedulerRegistry.deleteInterval(this.RECONNECT_INTERVAL_NAME);
+    if (this.schedulerRegistry.doesExist('interval', this.RECONNECT_INTERVAL_NAME)) {
+      this.schedulerRegistry.deleteInterval(this.RECONNECT_INTERVAL_NAME);
+    }
 
     this._connection?.removeAllListeners();
     await this._connection?.close();
