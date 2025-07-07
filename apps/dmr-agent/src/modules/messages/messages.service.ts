@@ -4,9 +4,9 @@ import {
   AgentEncryptedMessageDto,
   AgentEventNames,
   ChatMessagePayloadDto,
+  ClientConfigDto,
   ExternalServiceMessageDto,
   IAgent,
-  IAgentList,
   ISocketAckCallback,
   SocketAckResponse,
   SocketAckStatus,
@@ -25,7 +25,6 @@ import {
   Inject,
   Injectable,
   Logger,
-  OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
@@ -34,7 +33,7 @@ import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable()
-export class MessagesService implements OnModuleInit, OnModuleDestroy {
+export class MessagesService implements OnModuleInit {
   private readonly AGENTS_CACHE_KEY = 'DMR_AGENTS_LIST';
   private readonly logger = new Logger(MessagesService.name);
 
@@ -50,80 +49,70 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
     this.setupSocketEventListeners();
   }
 
-  onModuleDestroy() {
-    const socket = this.websocketService.getSocket();
-
-    socket.removeAllListeners();
-  }
-
-  private setupSocketEventListeners(): void {
-    if (!this.websocketService.isConnected()) {
-      this.logger.warn(
-        'WebSocket is not connected. Will retry setting up agent event listeners when connected.',
-      );
-      return;
-    }
-
+  setupSocketEventListeners(): void {
     const socket = this.websocketService.getSocket();
 
     if (!socket) {
       this.logger.error(
-        'Failed to get socket instance even though connection was reported as active',
+        'Cannot set up event listeners for agent events: Socket is not initialized',
       );
       return;
     }
 
-    socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: IAgentList) => {
+    // Socket.io automatically wraps the emitted data in an array
+    // So the type here is an array of arrays, ClientConfigDto[][]
+    socket.on(AgentEventNames.FULL_AGENT_LIST, async (data: ClientConfigDto[][]) => {
       const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
         event: AgentEventNames.FULL_AGENT_LIST,
       });
 
-      await this.handleFullAgentListEvent(data);
+      await this.handleFullAgentListEvent(data[0]);
 
       endTimer();
     });
 
-    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgentList) => {
+    socket.on(AgentEventNames.PARTIAL_AGENT_LIST, async (data: IAgent[][]) => {
       const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
         event: AgentEventNames.PARTIAL_AGENT_LIST,
       });
 
-      await this.handlePartialAgentListEvent(data);
+      await this.handlePartialAgentListEvent(data[0]);
 
       endTimer();
     });
 
     socket.on(
       AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-      async (data: AgentEncryptedMessageDto, ackCb: ISocketAckCallback) => {
+      async (data: AgentEncryptedMessageDto, ackCallback: ISocketAckCallback) => {
         const endTimer = this.metricService.messageProcessingDurationSecondsHistogram.startTimer({
           event: AgentEventNames.MESSAGE_FROM_DMR_SERVER,
         });
 
-        await this.handleMessageFromDMRServerEvent(data, ackCb);
+        await this.handleMessageFromDMRServerEvent(data, ackCallback);
 
         endTimer();
       },
     );
+
+    this.logger.log('Successfully set up socket event listeners for agent events.');
   }
 
-  private async handleFullAgentListEvent(data: IAgentList): Promise<void> {
+  private async handleFullAgentListEvent(data: ClientConfigDto[]): Promise<void> {
     try {
-      const responseItems = Array.isArray(data.response) ? data.response : [];
-      const validAgents: IAgent[] = [];
+      const validAgents: ClientConfigDto[] = [];
 
-      for (const item of responseItems) {
+      for (const item of data) {
         if (!item.id) continue;
 
-        const agentDto = plainToInstance(AgentDto, item);
-        const errors = await validate(agentDto);
+        const dto = plainToInstance(ClientConfigDto, item);
+        const errors = await validate(dto);
 
         if (errors.length > 0) {
           this.logger.error(`Validation failed for agent: ${JSON.stringify(errors)}`);
           continue;
         }
 
-        validAgents.push(agentDto);
+        validAgents.push(dto);
       }
 
       await this.cacheManager.set(this.AGENTS_CACHE_KEY, validAgents);
@@ -134,7 +123,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handlePartialAgentListEvent(data: IAgentList): Promise<void> {
+  private async handlePartialAgentListEvent(data: IAgent[]): Promise<void> {
     try {
       const currentAgents: IAgent[] =
         (await this.cacheManager.get<IAgent[]>(this.AGENTS_CACHE_KEY)) ?? [];
@@ -142,9 +131,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
       const agentMap: Map<string, IAgent> = new Map();
       currentAgents.forEach((agent: IAgent) => agentMap.set(agent.id, agent));
 
-      const responseItems = Array.isArray(data.response) ? data.response : [];
-
-      for (const item of responseItems) {
+      for (const item of data) {
         if (!item.id) continue;
 
         const agentDto = plainToInstance(AgentDto, item);
@@ -173,7 +160,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
 
   private async handleMessageFromDMRServerEvent(
     message: AgentEncryptedMessageDto,
-    ackCb: ISocketAckCallback,
+    ackCallback: ISocketAckCallback,
   ): Promise<void> {
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
@@ -181,7 +168,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
       if (!decryptedMessage) {
         this.logger.error('Failed to decrypt message from DMR Server');
 
-        return ackCb({
+        return ackCallback({
           status: SocketAckStatus.ERROR,
           errors: [
             {
@@ -205,7 +192,7 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
       if (!response) {
         this.logger.error('Failed to deliver message to External Service');
 
-        return ackCb({
+        return ackCallback({
           status: SocketAckStatus.ERROR,
           errors: [
             {
@@ -220,12 +207,12 @@ export class MessagesService implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log('Message is decrypted');
 
-      return ackCb({ status: SocketAckStatus.OK });
+      return ackCallback({ status: SocketAckStatus.OK });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling message from DMR Server: ${errorMessage}`);
 
-      return ackCb({
+      return ackCallback({
         status: SocketAckStatus.ERROR,
         errors: [
           {

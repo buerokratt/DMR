@@ -31,19 +31,19 @@ async function bootstrap(): Promise<void> {
   app.use(compression());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
 
-  await app.listen(appConfig.port);
-
-  if (appConfig.environment === 'development') {
-    logger.log(`Listening on ${await app.getUrl()}`);
-  }
-
   if (appConfig.mswEnable) {
-    logger.log('Mock values enabled');
+    logger.log('Mock values enabled - starting MSW server');
 
     const server = setupServer(...handlers);
     server.listen({
       onUnhandledRequest: 'bypass',
     });
+  }
+
+  await app.listen(appConfig.port);
+
+  if (appConfig.environment === 'development') {
+    logger.log(`Listening on ${await app.getUrl()}`);
   }
 }
 

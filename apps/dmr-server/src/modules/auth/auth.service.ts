@@ -1,4 +1,4 @@
-import { JwtPayload } from '@dmr/shared';
+import { AgentConnectionData, JwtPayload } from '@dmr/shared';
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { CentOpsService } from '../centops/centops.service';
@@ -13,7 +13,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async verifyToken(token: string): Promise<JwtPayload> {
+  async verifyToken(token: string): Promise<AgentConnectionData> {
     const clientId = this.getKidFromToken(token);
 
     if (!clientId) {
@@ -43,7 +43,12 @@ export class AuthService {
       throw new BadRequestException('Token sub and kid do not match');
     }
 
-    return Object.assign(verifiedToken, { cat: Date.now() });
+    return {
+      jwtPayload: Object.assign(verifiedToken, {
+        cat: Date.now(),
+      }),
+      authenticationCertificate: clientConfig.authenticationCertificate,
+    };
   }
 
   private decodeJwtHeader(token: string): JwtHeader | null {

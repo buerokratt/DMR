@@ -1,8 +1,8 @@
 import {
   AgentEventNames,
+  ClientConfigDto,
   ExternalServiceMessageDto,
   IAgent,
-  IAgentList,
   MessageType,
   SocketAckStatus,
   Utils,
@@ -128,9 +128,7 @@ describe('MessageService', () => {
   });
 
   it('should store only valid agents from full list', async () => {
-    const data: IAgentList = {
-      response: [agent1, deletedAgent, { ...agent2, id: null } as any],
-    };
+    const data: ClientConfigDto[] = [agent1, deletedAgent, { ...agent2, id: null } as any];
 
     await (service as any).handleFullAgentListEvent(data);
 
@@ -148,9 +146,7 @@ describe('MessageService', () => {
   it('should merge agents and delete marked ones on partial list event', async () => {
     cacheManager.get = vi.fn().mockResolvedValue([agent1]);
 
-    const update: IAgentList = {
-      response: [agent2, { ...agent1, deleted: true }],
-    };
+    const update: IAgent[] = [agent2, { ...agent1, deleted: true }];
 
     await (service as any).handlePartialAgentListEvent(update);
 
@@ -557,7 +553,7 @@ describe('MessageService', () => {
         expect.fail('Expected GatewayTimeoutException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(GatewayTimeoutException);
-        expect(error.message).toBe('Timeout');
+        expect((error as Error).message).toBe('Timeout');
       }
     });
 
@@ -576,7 +572,7 @@ describe('MessageService', () => {
         expect.fail('Expected BadGatewayException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(BadGatewayException);
-        expect(error.message).toBe('Gateway error');
+        expect((error as Error).message).toBe('Gateway error');
       }
     });
 
@@ -596,7 +592,7 @@ describe('MessageService', () => {
         expect.fail('Expected BadGatewayException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(BadGatewayException);
-        expect(error.message).toBe('Unexpected socket error');
+        expect((error as Error).message).toBe('Unexpected socket error');
       }
     });
 
@@ -616,7 +612,7 @@ describe('MessageService', () => {
         expect.fail('Expected BadGatewayException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(BadGatewayException);
-        expect(error.message).toBe('Unexpected error sending message to DMR Server');
+        expect((error as Error).message).toBe('Unexpected error sending message to DMR Server');
       }
     });
 

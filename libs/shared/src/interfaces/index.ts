@@ -1,3 +1,4 @@
+export * from './agent-connection.interface';
 export * from './agent.interface';
 export * from './centops.interface';
 export * from './jwt-payload.interface';

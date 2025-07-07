@@ -3,17 +3,21 @@ import { BadRequestException, Logger, UnauthorizedException } from '@nestjs/comm
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthService } from './auth.service';
 import { CentOpsService } from '../centops/centops.service';
+import { AuthService } from './auth.service';
 
-const mockCentOpsService = {
-  getCentOpsConfigurationByClientId: vi.fn(),
-};
+class MockCentOpsService {
+  getCentOpsConfigurationByClientId = vi.fn();
+}
 
-const mockJwtService = {
-  verifyAsync: vi.fn(),
-  decode: vi.fn(),
-};
+const mockCentOpsService = new MockCentOpsService();
+
+class MockJwtService {
+  verifyAsync = vi.fn();
+  decode = vi.fn();
+}
+
+const mockJwtService = new MockJwtService();
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -24,7 +28,13 @@ describe('AuthService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AuthService,
+        {
+          provide: AuthService,
+          useFactory: (centOpsService: CentOpsService, jwtService: JwtService) => {
+            return new AuthService(centOpsService, jwtService);
+          },
+          inject: [CentOpsService, JwtService],
+        },
         {
           provide: CentOpsService,
           useValue: mockCentOpsService,
@@ -73,7 +83,15 @@ describe('AuthService', () => {
       expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(testToken, {
         publicKey: mockPublicKey,
       });
-      expect(result).toEqual(mockPayload);
+      expect(result).toEqual({
+        jwtPayload: expect.objectContaining({
+          sub: mockClientId,
+          iat: 123,
+          exp: 123,
+          cat: expect.any(Number),
+        }),
+        authenticationCertificate: mockPublicKey,
+      });
     });
 
     it('should throw BadRequestException if getKidFromToken returns null', async () => {

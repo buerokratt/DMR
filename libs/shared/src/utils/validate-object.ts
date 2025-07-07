@@ -16,5 +16,5 @@ export const validateObject = <Data>(data: Data, rules: Joi.PartialSchemaMap<Dat
     throw new Error('Environment variables validation failed.');
   }
 
-  return values as Data;
+  return values;
 };
