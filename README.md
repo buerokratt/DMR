@@ -90,8 +90,6 @@ For development purposes, there is also a simplified docker-compose file in the 
 
 ## Environment Variables
 
-<!-- todo mocked centops? -- OR CREATE TASK -->
-
 Below is a list of all environment variables used by the DMR system, organized by service. Sensible variable values are also specified in the docker-compose file.
 
 ### DMR Server variables
@@ -110,7 +108,7 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `RABBITMQ_DEFAULT_MANAGEMENT_UI_URI`          | URI for RabbitMQ management interface                                                                                                                                | Yes      |                       |
 | `RABBITMQ_DEFAULT_USER`                       | Username for RabbitMQ authentication                                                                                                                                 | Yes      |                       |
 | `RABBITMQ_DEFAULT_PASS`                       | Password for RabbitMQ authentication                                                                                                                                 | Yes      |                       |
-| `RABBITMQ_DEFAULT_TTL`                        | Default message TTL (ms)                                                                                                                                             |          | `300000` (5 minutes)  |
+| `RABBITMQ_DEFAULT_TTL`                        | Default message TTL (ms) for normal agent queues                                                                                                                     |          | `300000` (5 minutes)  |
 | `RABBITMQ_DEFAULT_DLQ_TTL`                    | TTL (ms) for messages in agent dead letter queues (DLQs)                                                                                                             |          | `86400000` (24 hours) |
 | `RABBITMQ_VALIDATION_FAILURES_TTL`            | TTL (ms) for messages in validation failures queue                                                                                                                   |          | `86400000` (24 hours) |
 | `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts from DMR server to RabbitMQ                                                                                                  |          | `5000` (5 seconds)    |
