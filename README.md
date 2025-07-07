@@ -60,6 +60,7 @@ graph TD
 - There can be several instances of DMR server running, depending on load.
 - In the future, can potentially be extended to perform operations — like applying policies — on incoming and outgoing messages.
 - Includes support for Prometheus-based monitoring to help track the real-time health and behavior of the DMR server, specifically around WebSocket activity and message processing.
+- **Metrics endpoint**: [`http://localhost:${PORT}/metrics`](http://localhost:PORT/metrics) — compatible with Prometheus.
 
 ### RabbitMQ
 
