@@ -90,11 +90,7 @@ For development purposes, there is also a simplified docker-compose file in the 
 
 ## Environment Variables
 
-<!-- todo: mention docker compose file -->
 <!-- todo mocked centops? -- OR CREATE TASK -->
-<!-- todo required env vars -->
-<!-- todo comment/suggestions -->
-<!-- todo RABBITMQ_DEFAULT_TTL -->
 
 Below is a list of all environment variables used by the DMR system, organized by service. Sensible variable values are also specified in the docker-compose file.
 
@@ -121,7 +117,7 @@ Below is a list of all environment variables used by the DMR system, organized b
 
 #### CentOps mock variables
 
-The following variables are **required** in DMR Server when using CentOps configuration endpoint mock. These should be removed when CentOps is no longer mocked.
+The following variables are **required in DMR Server** when using CentOps configuration endpoint mock. These should be removed when CentOps is no longer mocked.
 
 | Variable                       | Description                                                                                                 | Default Value |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------------- |
@@ -134,26 +130,26 @@ The following variables are **required** in DMR Server when using CentOps config
 
 ### DMR Agent variables
 
-| Variable                           | Description                                              | Required | Default Value    |
-| ---------------------------------- | -------------------------------------------------------- | -------- | ---------------- |
-| `PORT`                             | Port on which the DMR agent will run                     |          | `5001`           |
-| `ENVIRONMENT`                      | Runtime environment                                      |          | `development`    |
-| `LOGGER_COLORS`                    | Enable colored logs                                      |          | `true`           |
-| `LOGGER_LOG_LEVELS`                | Comma-separated log levels to output                     |          | `error,warn,log` |
-| `DMR_SERVER_WEBSOCKET_URL`         | WebSocket URL for connecting to DMR server               | Yes      |                  |
-| `WEBSOCKET_RECONNECTION_DELAY`     | Initial delay (ms) for WebSocket reconnection attempts   |          | `1000`           |
-| `WEBSOCKET_RECONNECTION_DELAY_MAX` | Maximum delay (ms) for WebSocket reconnection attempts   |          | `5000`           |
-| `AGENT_ID`                         | Unique identifier (UUID) for the agent                   | Yes      |                  |
-| `AGENT_PRIVATE_KEY`                | RSA private key for message encryption/decryption        | Yes      |                  |
-| `OUTGOING_MESSAGE_ENDPOINT`        | HTTP endpoint where decrypted messages will be forwarded |          |                  |
-| `MESSAGE_DELIVERY_TIMEOUT_MS`      | Timeout (ms) for message delivery to the endpoint        |          | `2000`           |
+| Variable                           | Description                                                                                                                   | Required | Default Value    |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
+| `PORT`                             | Port on which the DMR agent will run                                                                                          |          | `5001`           |
+| `ENVIRONMENT`                      | NodeJS Runtime environment. **Should be set to `production` when deployed to ANY environment, including test environments.**  |          | `development`    |
+| `LOGGER_COLORS`                    | Enable colored logs. **Strongly suggest to disable when deployed.**                                                           |          | `true`           |
+| `LOGGER_LOG_LEVELS`                | Comma-separated log levels to output                                                                                          |          | `error,warn,log` |
+| `DMR_SERVER_WEBSOCKET_URL`         | URL for connecting to DMR Server via WebSocket                                                                                | Yes      |                  |
+| `WEBSOCKET_RECONNECTION_DELAY`     | Initial delay (ms) for WebSocket reconnection attempts                                                                        |          | `1000`           |
+| `WEBSOCKET_RECONNECTION_DELAY_MAX` | Maximum delay (ms) for WebSocket reconnection attempts                                                                        |          | `5000`           |
+| `AGENT_ID`                         | Unique identifier (UUID) for the agent                                                                                        | Yes      |                  |
+| `AGENT_PRIVATE_KEY`                | RSA private key for message encryption/decryption and DMR Server authentication                                               | Yes      |                  |
+| `OUTGOING_MESSAGE_ENDPOINT`        | HTTP endpoint where decrypted messages will be forwarded inside DMR Agent cluster                                             | Yes      |                  |
+| `MESSAGE_DELIVERY_TIMEOUT_MS`      | Timeout (ms) for forwarding the message to DMR Server. Incoming message endpoint will return 504 if this timeout is exceeded. |          | `2000`           |
 
 ### RabbitMQ variables
 
-| Variable                | Description                          | Required | Default Value |
-| ----------------------- | ------------------------------------ | -------- | ------------- |
-| `RABBITMQ_DEFAULT_USER` | Username for RabbitMQ authentication | Yes      |               |
-| `RABBITMQ_DEFAULT_PASS` | Password for RabbitMQ authentication | Yes      |               |
+| Variable                | Description                          | Required |
+| ----------------------- | ------------------------------------ | -------- |
+| `RABBITMQ_DEFAULT_USER` | Username for RabbitMQ authentication | Yes      |
+| `RABBITMQ_DEFAULT_PASS` | Password for RabbitMQ authentication | Yes      |
 
 ## Prometheus
 
