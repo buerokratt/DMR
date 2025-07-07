@@ -149,6 +149,12 @@ The following variables are **required in DMR Server** when using CentOps config
 | `RABBITMQ_DEFAULT_USER` | Username for RabbitMQ authentication | Yes      |
 | `RABBITMQ_DEFAULT_PASS` | Password for RabbitMQ authentication | Yes      |
 
+## RabbitMQ
+
+### Kubernetes
+
+Can be set up using [RabbitMQ Cluster Kubernetes Operator](https://www.rabbitmq.com/kubernetes/operator/using-operator). It supports declaratively deploy and manage RabbitMQ clusters on Kubernetes. Simplifies setup, scaling, and enables native support for Prometheus metrics via ServiceMonitor resources.
+
 ## Prometheus
 
 ### DMR server
