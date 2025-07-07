@@ -67,7 +67,26 @@ graph TD
 - Has a dead letter queue for messages that failed to deliver.
 - Has RabbitMQ UI-based monitoring tools set up.
 - Supports RabbitMQ clustering for scalability.
-- https://www.rabbitmq.com/kubernetes/operator/operator-monitoring
+- <https://www.rabbitmq.com/kubernetes/operator/operator-monitoring>
+
+## Docker and Docker Compose
+
+The DMR system can be easily deployed using Docker and Docker Compose. The repository includes Docker configurations for all components.
+
+### Docker Files
+
+- DMR Server Dockerfile: [`apps/dmr-server/Dockerfile`](apps/dmr-server/Dockerfile)
+- DMR Agent Dockerfile: [`apps/dmr-agent/Dockerfile`](apps/dmr-agent/Dockerfile)
+
+### Docker Compose
+
+The main Docker Compose file is located at the root of the repository: [`docker-compose.yml`](docker-compose.yml). Run with the following command from the root directory of the project:
+
+```bash
+docker compose up -d
+```
+
+For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
 
 ## Prometheus
 
@@ -150,7 +169,7 @@ List of metrics:
 - **`dmr_http_errors_total` | `counter`** | `method, route`
   Count of error responses (4xx/5xx)
 
-- **`dmr_agent_socket_connection_active `** | `gauge`
+- **`dmr_agent_socket_connection_active`** | `gauge`
   Current number of active Socket.IO connections
 
 - **`dmr_socket_connection_duration_seconds`** | `histogram`
