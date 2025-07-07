@@ -15,19 +15,19 @@ So the goal is to built a system that can efficiently and securely forward quest
 graph TD
   subgraph Client A cluster
     A1[DMR Agent A]
-    A2[Other Services A]
+    A2[Other Services A]:::grey
     A1 <--> A2
   end
 
   subgraph Central cluster
-    S[DMR Server]:::bold
+    S[DMR Server<br/><i>several instances</i>]:::bold
     MQ[RabbitMQ Cluster]
     CO((CentOps<br/><i>not in scope</i>)):::grey
   end
 
   subgraph Client B cluster
     B1[DMR Agent B]
-    B2[Other Services B]
+    B2[Other Services B]:::grey
     B1 <--> B2
   end
 
@@ -241,8 +241,8 @@ groups:
 
 ### RabbitMQ
 
-- https://www.rabbitmq.com/kubernetes/operator/operator-monitoring
-- https://www.rabbitmq.com/docs/prometheus
+- <https://www.rabbitmq.com/kubernetes/operator/operator-monitoring>
+- <https://www.rabbitmq.com/docs/prometheus>
 
 Suggested metrics:
 
