@@ -18,17 +18,7 @@ export default defineConfig({
   },
   plugins: [
     swc.vite({
-      jsc: {
-        parser: {
-          syntax: 'typescript',
-          tsx: false,
-          decorators: true,
-        },
-        target: 'es2022',
-        transform: {
-          decoratorMetadata: true,
-        },
-      },
+      module: { type: 'es6' },
     }),
   ],
 });
