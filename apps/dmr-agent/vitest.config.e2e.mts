@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
@@ -10,23 +11,14 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@src': __dirname + '/src',
-      test: __dirname + '/test',
+      '@src': resolve(__dirname, '/src'),
+      test: resolve(__dirname, '/test'),
+      '@dmr/shared': resolve(__dirname, '../../libs/shared/src'),
     },
   },
   plugins: [
     swc.vite({
-      jsc: {
-        parser: {
-          syntax: 'typescript',
-          tsx: false,
-          decorators: true,
-        },
-        target: 'es2022',
-        transform: {
-          decoratorMetadata: true,
-        },
-      },
+      module: { type: 'es6' },
     }),
   ],
 });

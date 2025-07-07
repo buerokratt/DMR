@@ -21,6 +21,8 @@
     "e2e": "nx run-many --target=e2e --all",
     "e2e:server": "nx e2e dmr-server ",
     "e2e:agent": "nx e2e dmr-agent",
+    "e2e:server:log": "nx e2e dmr-server -- --reporter=verbose",
+    "e2e:agent:log": "nx e2e dmr-agent -- --reporter=verbose",
     "clean": "rimber dist node_modules/.cache",
     "check:full": "pnpm run format && pnpm run lint && pnpm run format:check && pnpm run lint:check"
   },

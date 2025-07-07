@@ -37,6 +37,7 @@ const mockHistogram = {
 
 const mockMetricService = {
   httpRequestTotalCounter: mockCounter,
+  httpSuccessTotalCounter: mockCounter,
   httpErrorsTotalCounter: mockCounter,
   httpRequestDurationSecondsHistogram: mockCounter,
   errorsTotalCounter: mockCounter,
