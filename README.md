@@ -113,9 +113,9 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `RABBITMQ_VALIDATION_FAILURES_TTL`            | TTL (ms) for messages in validation failures queue                                                                                                                   |          | `86400000` (24 hours) |
 | `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts from DMR server to RabbitMQ                                                                                                  |          | `5000` (5 seconds)    |
 
-#### CentOps mock variables
+#### CentOps mock
 
-The following variables are **required in DMR Server** when using CentOps configuration endpoint mock. These should be removed when CentOps is no longer mocked.
+CentOps configuration endpoint is currently mocked in DMR Server. The following variables are **required in DMR Server** when using this mock. These should be removed when CentOps is no longer mocked.
 
 | Variable                       | Description                                                                                                 | Default Value |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------------- |
