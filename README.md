@@ -90,7 +90,12 @@ For development purposes, there is also a simplified docker-compose file in the 
 
 ## Environment Variables
 
-Below is a list of all environment variables used by the DMR system, organized by service.
+<!-- todo: mention docker compose file -->
+<!-- todo mocked centops? -- OR CREATE TASK -->
+<!-- todo required env vars -->
+<!-- todo comment/suggestions -->
+
+Below is a list of all environment variables used by the DMR system, organized by service. Sensible env variable values are also specified in the docker-compose file.
 
 ### DMR Server
 
@@ -100,13 +105,24 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `ENVIRONMENT`                           | Runtime environment                               | `development`        |
 | `LOGGER_COLORS`                         | Enable colored logs                               | `true`               |
 | `LOGGER_LOG_LEVELS`                     | Comma-separated log levels to output              | `error,warn,log`     |
-| `WEB_SOCKET_MAX_DISCONNECTION_DURATION` | Maximum duration (ms) for WebSocket disconnection | `120000`             |
+| `WEB_SOCKET_MAX_DISCONNECTION_DURATION` | Maximum duration (ms) for WebSocket disconnection | `120000` (2 minutes)             |
 | `CENTOPS_CONFIGURATION_URL`             | URL for CentOps configuration service             | Required, no default |
-| `CENTOPS_CONFIGURATION_CRON_TIME`       | Cron schedule for fetching CentOps configuration  | `*/30 * * * *`       |
+| `CENTOPS_CONFIGURATION_CRON_TIME`       | Cron schedule for fetching configuration (agent list) from CentOps | `*/30 * * * *`       |
 | `MOCK_DMR_AGENT_A_PUBLIC_KEY`           | Public key for mock Agent A (development/testing) | N/A                  |
 | `MOCK_DMR_AGENT_B_PUBLIC_KEY`           | Public key for mock Agent B (development/testing) | N/A                  |
 | `MOCK_DMR_AGENT_A_ID`                   | UUID for mock Agent A (development/testing)       | N/A                  |
 | `MOCK_DMR_AGENT_B_ID`                   | UUID for mock Agent B (development/testing)       | N/A                  |
+| `RABBITMQ_DEFAULT_USER`                       | Username for RabbitMQ authentication       | Required, no default  |
+| `RABBITMQ_DEFAULT_PASS`                       | Password for RabbitMQ authentication       | Required, no default  |
+| `RABBITMQ_DEFAULT_TTL`                        | Default message TTL (ms)                   | `300000` (5 minutes)  |
+| `RABBITMQ_DEFAULT_PORT`                       | Port for RabbitMQ AMQP connection          | Required, no default  |
+| `RABBITMQ_DEFAULT_HOST`                       | Hostname for RabbitMQ connection           | Required, no default  |
+| `RABBITMQ_DEFAULT_MANAGEMENT_UI_URI`          | URI for RabbitMQ management interface      | Required, no default  |
+| `RABBITMQ_DEFAULT_DLQ_TTL`                    | TTL (ms) for messages in dead letter queue | `86400000` (24 hours) |
+| `RABBITMQ_VALIDATION_FAILURES_TTL`            | TTL (ms) for validation failure messages   | `86400000` (24 hours) |
+| `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts    | `5000` (5 seconds)    |
+| `MSW_ENABLED` | Enables CentOps configuration mock | `true` |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | Disables TLS certificate trust check, required for CentOps mock | `0`  |
 
 ### DMR Agent
 
@@ -122,6 +138,7 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `AGENT_ID`                         | Unique identifier (UUID) for the agent                   | Required, no default |
 | `AGENT_PRIVATE_KEY`                | RSA private key for message encryption/decryption        | Required, no default |
 | `OUTGOING_MESSAGE_ENDPOINT`        | HTTP endpoint where decrypted messages will be forwarded | Optional             |
+| `MESSAGE_DELIVERY_TIMEOUT_MS`      | Timeout (ms) for message delivery to the endpoint        | `2000`               |
 
 ### RabbitMQ
 
@@ -129,13 +146,6 @@ Below is a list of all environment variables used by the DMR system, organized b
 | --------------------------------------------- | ------------------------------------------ | --------------------- |
 | `RABBITMQ_DEFAULT_USER`                       | Username for RabbitMQ authentication       | Required, no default  |
 | `RABBITMQ_DEFAULT_PASS`                       | Password for RabbitMQ authentication       | Required, no default  |
-| `RABBITMQ_DEFAULT_TTL`                        | Default message TTL (ms)                   | `300000` (5 minutes)  |
-| `RABBITMQ_DEFAULT_PORT`                       | Port for RabbitMQ AMQP connection          | Required, no default  |
-| `RABBITMQ_DEFAULT_HOST`                       | Hostname for RabbitMQ connection           | Required, no default  |
-| `RABBITMQ_DEFAULT_MANAGEMENT_UI_URI`          | URI for RabbitMQ management interface      | Required, no default  |
-| `RABBITMQ_DEFAULT_DLQ_TTL`                    | TTL (ms) for messages in dead letter queue | `86400000` (24 hours) |
-| `RABBITMQ_VALIDATION_FAILURES_TTL`            | TTL (ms) for validation failure messages   | `86400000` (24 hours) |
-| `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts    | `5000` (5 seconds)    |
 
 ## Prometheus
 
