@@ -190,7 +190,7 @@ DMR Agent will accept incoming messages on `/v1/messages` POST endpoint. It will
 
 Messages endpoint supports versioning. The `v1` version message JSON structure is the following. This structure closely matches the DB schema of [Chatbot module](https://github.com/buerokratt/Buerokratt-Chatbot).
 
-```json
+```jsonc
 {
   "id": "b1a7e8c2-1234-4f56-9abc-1234567890ab",
   "recipientId": "d3b07384-d9a0-4c3f-a4e2-123456789abc",
@@ -208,7 +208,7 @@ Messages endpoint supports versioning. The `v1` version message JSON structure i
       "endUserPhone": "+123456789",
       "customerSupportDisplayName": "Support Bot",
       "endUserOs": "Windows",
-      "endUserUrl": "https://example.com"
+      "endUserUrl": "https://example.com",
     },
     "messages": [
       {
@@ -233,10 +233,10 @@ Messages endpoint supports versioning. The `v1` version message JSON structure i
         "preview": "Preview text",
         "updated": "2024-01-15T10:31:00.000Z",
         "buttons": "[]",
-        "options": "{}"
-      }
-    ]
-  }
+        "options": "{}",
+      },
+    ],
+  },
 }
 ```
 
