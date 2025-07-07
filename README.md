@@ -86,8 +86,6 @@ The main Docker Compose file is located at the root of the repository: [`docker-
 docker compose up -d
 ```
 
-For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
-
 ## Environment Variables
 
 Below is a list of all environment variables used by the DMR system, organized by service. Sensible variable values are also specified in the docker-compose file.
@@ -404,7 +402,9 @@ Suggested alert rules:
     description: "Less than 10 GB disk free. Could lead to message persistence issues."
 ```
 
-## Available Scripts
+## Local development
+
+For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
 
 ### Development
 
