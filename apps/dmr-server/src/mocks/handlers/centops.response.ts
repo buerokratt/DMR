@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
-  http.get(process.env.CENTOPS_CONFIGURATION_URL ?? '', () => {
+  http.get(process.env.CENTOPS_CONFIGURATION_URL as string, () => {
     return HttpResponse.json({
       response: [
         {
