@@ -70,46 +70,38 @@ So the goal is to build a system that can efficiently and securely forward quest
 
 ## Local development
 
-For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
+### Installation
 
-### Development
+```bash
+nvm install
+# Install pnpm
+corepack enable pnpm
+corepack up
+pnpm install
+cp .env.example .env
+```
 
-- `start:server`: Start the DMR server in development mode
-- `start:agent`: Start the DMR agent in development mode
+### Running
 
-### Building
+```bash
+docker compose -f apps/dmr-server/docker-compose.yml up -d # Start RabbitMQ
+pnpm start:server
+pnpm start:agent
+```
 
-- `build`: Build all applications
-- `build:server`: Build only the DMR server
-- `build:agent`: Build only the DMR agent
+### Tests
 
-### Testing
-
-- `test`: Run tests for all applications
-- `test:server`: Run tests for DMR server
-- `test:agent`: Run tests for DMR agent
+- `pnpm test:server:log`: Run tests for DMR server
+- `pnpm test:agent:log`: Run tests for DMR agent
+<!-- todo below -->
 - `e2e`: Run end-to-end tests for all applications
 - `e2e:server`: Run end-to-end tests for DMR server
 - `e2e:agent`: Run end-to-end tests for DMR agent
 
-For detailed test output, you can add the `--reporter=verbose` flag to any test command:
-
-```bash
-pnpm test:server -- --reporter=verbose
-pnpm e2e:server -- --reporter=verbose
-```
-
 ### Code Quality
 
-- `lint`: Run ESLint on all files
-- `lint:check`: Check for ESLint errors with zero warnings allowed
-- `lint:fix`: Fix auto-fixable ESLint issues
-- `format`: Format code using Prettier
-- `format:check`: Check code formatting
-
-### Utility
-
-- `clean`: Clean build artifacts and cache
+- `pnpm lint:check`: Check for ESLint errors and warnings
+- `pnpm format:check`: Check code formatting with Prettier
 
 ## Docker and Docker Compose
 
