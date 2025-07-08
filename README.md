@@ -94,7 +94,7 @@ You can test the whole flow of the solution this way:
 1. Install [ngrok](https://ngrok.com) and run it with `ngrok http http://localhost:8080`.
 2. Copy the URL provided by ngrok and set it as `OUTGOING_MESSAGE_ENDPOINT` for `dmr-agent-a` in `docker-compose.yml`.
 3. Run `docker compose up -d`.
-4. Run this command to send a message in [the proper format](#message-format) through `dmr-agent-b`:
+4. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
 
 ```bash
 curl -X POST http://localhost:8074/v1/messages \
