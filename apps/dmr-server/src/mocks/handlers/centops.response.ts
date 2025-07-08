@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
-  http.get('http://localhost:3000/centops/clients', () => {
+  http.get(process.env.CENTOPS_CONFIGURATION_URL as string, () => {
     return HttpResponse.json({
       response: [
         {

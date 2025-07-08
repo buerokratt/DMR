@@ -87,11 +87,44 @@ The main Docker Compose file is located at the root of the repository: [`docker-
 docker compose up -d
 ```
 
-For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
+### Manual testing
+
+You can test the whole flow of the solution this way:
+
+1. Install [ngrok](https://ngrok.com) and run it with `ngrok http http://localhost:8080`.
+2. Copy the URL provided by ngrok and set it as `OUTGOING_MESSAGE_ENDPOINT` for `dmr-agent-a` in `docker-compose.yml`.
+3. Run `docker compose up -d`.
+4. Run this command to send a message in [the proper format](#message-format) through `dmr-agent-b`:
+
+```bash
+curl -X POST http://localhost:8074/v1/messages \
+    -H "Content-Type: application/json" \
+    -d '{
+    "id": "b1a7e8c2-1234-4f56-9abc-1234567890ab",
+    "recipientId": "d3b07384-d9a0-4c3f-a4e2-123456789abc",
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "type": "ChatMessage",
+    "payload": {
+      "chat": {
+        "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "created": "2024-01-15T10:00:00.000Z"
+      },
+      "messages": [
+        {
+          "id": "550e8400-e29b-41d4-a716-446655440000",
+          "chatId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+          "content": "example string 2",
+          "authorTimestamp": "2024-01-15T10:30:00.000Z",
+          "authorRole": "end-user"
+        }
+      ]
+    }
+  }'
+```
+
+5. `dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You should see the message in the ngrok tunnel.
 
 ## Environment Variables
-
-<!-- todo mocked centops? -- OR CREATE TASK -->
 
 Below is a list of all environment variables used by the DMR system, organized by service. Sensible variable values are also specified in the docker-compose file.
 
@@ -104,21 +137,21 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `LOGGER_COLORS`                               | Enable colored logs. **Strongly suggest to disable when deployed.**                                                                                                  |          | `true`                |
 | `LOGGER_LOG_LEVELS`                           | Comma-separated log levels to output                                                                                                                                 |          | `error,warn,log`      |
 | `WEB_SOCKET_MAX_DISCONNECTION_DURATION`       | Maximum duration (ms) for DMR Agent WebSocket disconnection. Used by [connection state recovery](https://socket.io/docs/v4/server-options/#connectionstaterecovery). |          | `120000` (2 minutes)  |
-| `CENTOPS_CONFIGURATION_URL`                   | URL for CentOps configuration service. **Should be set to `https://centops.burokratt.com/api/v1/dmr-agent-list` when using CentOps configuration endpoint mock.**    | Yes      |                       |
+| `CENTOPS_CONFIGURATION_URL`                   | URL for CentOps configuration service. **Can be set to any value when using [CentOps configuration endpoint mock](#centops-mock).**                                  | Yes      |                       |
 | `CENTOPS_CONFIGURATION_CRON_TIME`             | Cron schedule for fetching configuration (agent list) from CentOps                                                                                                   |          | `*/30 * * * *`        |
 | `RABBITMQ_DEFAULT_HOST`                       | Hostname for RabbitMQ connection                                                                                                                                     | Yes      |                       |
 | `RABBITMQ_DEFAULT_PORT`                       | Port for RabbitMQ AMQP connection                                                                                                                                    | Yes      |                       |
 | `RABBITMQ_DEFAULT_MANAGEMENT_UI_URI`          | URI for RabbitMQ management interface                                                                                                                                | Yes      |                       |
 | `RABBITMQ_DEFAULT_USER`                       | Username for RabbitMQ authentication                                                                                                                                 | Yes      |                       |
 | `RABBITMQ_DEFAULT_PASS`                       | Password for RabbitMQ authentication                                                                                                                                 | Yes      |                       |
-| `RABBITMQ_DEFAULT_TTL`                        | Default message TTL (ms)                                                                                                                                             |          | `300000` (5 minutes)  |
+| `RABBITMQ_DEFAULT_TTL`                        | Default message TTL (ms) for normal agent queues                                                                                                                     |          | `300000` (5 minutes)  |
 | `RABBITMQ_DEFAULT_DLQ_TTL`                    | TTL (ms) for messages in agent dead letter queues (DLQs)                                                                                                             |          | `86400000` (24 hours) |
 | `RABBITMQ_VALIDATION_FAILURES_TTL`            | TTL (ms) for messages in validation failures queue                                                                                                                   |          | `86400000` (24 hours) |
 | `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts from DMR server to RabbitMQ                                                                                                  |          | `5000` (5 seconds)    |
 
-#### CentOps mock variables
+#### CentOps mock
 
-The following variables are **required in DMR Server** when using CentOps configuration endpoint mock. These should be removed when CentOps is no longer mocked.
+CentOps configuration endpoint is currently mocked in DMR Server. The following variables are **required in DMR Server** when using this mock. These should be removed when CentOps is no longer mocked.
 
 | Variable                       | Description                                                                                                 | Default Value |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------------- |
@@ -151,6 +184,68 @@ The following variables are **required in DMR Server** when using CentOps config
 | ----------------------- | ------------------------------------ | -------- |
 | `RABBITMQ_DEFAULT_USER` | Username for RabbitMQ authentication | Yes      |
 | `RABBITMQ_DEFAULT_PASS` | Password for RabbitMQ authentication | Yes      |
+
+## Sending messages
+
+DMR Agent will accept incoming messages on `/v1/messages` POST endpoint. It will forward outgoing messages to the `OUTGOING_MESSAGE_ENDPOINT`. See [DMR Agent variables](#dmr-agent-variables).
+
+Messages endpoint supports versioning. The `v1` version message JSON structure is the following. This structure closely matches the DB schema of [Chatbot module](https://github.com/buerokratt/Buerokratt-Chatbot).
+
+```jsonc
+{
+  "id": "b1a7e8c2-1234-4f56-9abc-1234567890ab",
+  "recipientId": "d3b07384-d9a0-4c3f-a4e2-123456789abc",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "type": "ChatMessage", // For now, only ChatMessage is supported
+  "payload": {
+    "chat": {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "created": "2024-01-15T10:00:00.000Z",
+      // All fields below are optional:
+      "endUserFirstName": "Alice",
+      "endUserLastName": "Smith",
+      "endUserId": "user-123",
+      "endUserEmail": "alice@example.com",
+      "endUserPhone": "+123456789",
+      "customerSupportDisplayName": "Support Bot",
+      "endUserOs": "Windows",
+      "endUserUrl": "https://example.com",
+    },
+    "messages": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "chatId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "content": "example string 2",
+        "authorTimestamp": "2024-01-15T10:30:00.000Z",
+        "authorRole": "end-user",
+        // All fields below are optional:
+        "event": "joined",
+        "csaTitle": "Agent",
+        "authorId": "agent-123",
+        "authorFirstName": "Bob",
+        "authorLastName": "Brown",
+        "forwardedByUser": "user-456",
+        "forwardedFromCsa": "Support A",
+        "forwardedToCsa": "Support B",
+        "originalBaseId": "base-789",
+        "originalCreated": "2024-01-15T09:00:00.000Z",
+        "rating": "5",
+        "created": "2024-01-15T10:30:00.000Z",
+        "preview": "Preview text",
+        "updated": "2024-01-15T10:31:00.000Z",
+        "buttons": "[]",
+        "options": "{}",
+      },
+    ],
+  },
+}
+```
+
+## RabbitMQ
+
+### Kubernetes
+
+Can be set up using [RabbitMQ Cluster Kubernetes Operator](https://www.rabbitmq.com/kubernetes/operator/using-operator). It supports declaratively deploy and manage RabbitMQ clusters on Kubernetes. Simplifies setup, scaling, and enables native support for Prometheus metrics via ServiceMonitor resources.
 
 ## Prometheus
 
@@ -401,7 +496,9 @@ Suggested alert rules:
     description: "Less than 10 GB disk free. Could lead to message persistence issues."
 ```
 
-## Available Scripts
+## Local development
+
+For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
 
 ### Development
 
