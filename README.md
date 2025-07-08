@@ -243,6 +243,36 @@ Messages endpoint supports versioning. The `v1` version message JSON structure i
 
 ## RabbitMQ
 
+### Queues
+
+The RabbitMQ setup includes several types of queues to handle message routing and failure scenarios. All queues are **durable** and survive broker restarts. All messages are **persistent** so they are written to disk and survive broker restarts.
+
+#### Normal Queues
+
+- Each DMR agent has its own dedicated message queue for receiving messages.
+- New agent queues are created when DMR server receives new agents in configuration from CentOps.
+- Queue naming convention: `{agent-id}`. The agent ID (UUID) serves as the queue name.
+- All queues are configured as quorum queues to support RabbitMQ clustering.
+- Messages have configurable TTL (`RABBITMQ_DEFAULT_TTL`) with automatic expiration. Default is 5 minutes.
+
+#### Dead Letter Queues (DLQs)
+
+- Each agent queue has a corresponding dead letter queue: `{agent-id}.dlq`.
+- DLQs are automatically created when setting up agent queues.
+- Messages are moved to a DLQ if:
+  - Sending messages fails due to some network error or similar — and retries are not successful.
+  - Message TTL expires in the original queue.
+- DLQs have their own TTL configuration (`RABBITMQ_DEFAULT_DLQ_TTL`) for automatic cleanup. Default is 24 hours.
+
+#### Validation Failures Queue
+
+- This is a **single** queue for all validation failures, it is not per-agent. The name is `validation-failures`.
+- It is created on DMR Server start if it does not yet exist.
+- Messages are moved to this queue if:
+  - Message validation fails when DMR server receives an incoming message, e.g. if the message has no valid `recipientId`.
+  - Recipient DMR agent is not able to decrypt the message.
+- This queue has its own TTL configuration (`RABBITMQ_VALIDATION_FAILURES_TTL`) for automatic cleanup. Default is 24 hours.
+
 ### Kubernetes
 
 Can be set up using [RabbitMQ Cluster Kubernetes Operator](https://www.rabbitmq.com/kubernetes/operator/using-operator). It supports declaratively deploy and manage RabbitMQ clusters on Kubernetes. Simplifies setup, scaling, and enables native support for Prometheus metrics via ServiceMonitor resources.
