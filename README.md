@@ -1,14 +1,6 @@
 # DMR (Distributed Message Rooms)
 
-## Business case
-
-Currently, there is no way to pass questions from one Bürokratt instance to another. This means that if an end-user asks a question that the local Bürokratt instance cannot answer, he will receive no meaningful reply — even if some other Bürokratt instance could answer it.
-
-An example: a user comes to the Tax Authority web, and asks a question about crime, the Tax Authority instance will not be able to answer it. The Police instance **is able** to answer the question but there is no way to forward it.
-
-So the goal is to built a system that can efficiently and securely forward questions and answers between Bürokratt instances.
-
-## Architecture chart
+## Architectural overview
 
 ```mermaid
 %%{ init: { "theme": "default", "flowchart": { "htmlLabels": true, "curve": "linear" } } }%%
@@ -40,7 +32,13 @@ graph TD
   classDef grey fill:#e0e0e0,stroke:#888,stroke-width:1;
 ```
 
-## Key components
+### Business case
+
+Currently, there is no way to pass questions from one Bürokratt instance to another. This means that if an end-user asks a question that the local Bürokratt instance cannot answer, he will receive no meaningful reply — even if some other Bürokratt instance could answer it.
+
+An example: a user comes to the Tax Authority web, and asks a question about crime, the Tax Authority instance will not be able to answer it. The Police instance **is able** to answer the question but there is no way to forward it.
+
+So the goal is to build a system that can efficiently and securely forward questions and answers between Bürokratt instances.
 
 ### DMR agents
 
@@ -70,6 +68,49 @@ graph TD
 - Supports RabbitMQ clustering for scalability.
 - <https://www.rabbitmq.com/kubernetes/operator/operator-monitoring>
 
+## Local development
+
+For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
+
+### Development
+
+- `start:server`: Start the DMR server in development mode
+- `start:agent`: Start the DMR agent in development mode
+
+### Building
+
+- `build`: Build all applications
+- `build:server`: Build only the DMR server
+- `build:agent`: Build only the DMR agent
+
+### Testing
+
+- `test`: Run tests for all applications
+- `test:server`: Run tests for DMR server
+- `test:agent`: Run tests for DMR agent
+- `e2e`: Run end-to-end tests for all applications
+- `e2e:server`: Run end-to-end tests for DMR server
+- `e2e:agent`: Run end-to-end tests for DMR agent
+
+For detailed test output, you can add the `--reporter=verbose` flag to any test command:
+
+```bash
+pnpm test:server -- --reporter=verbose
+pnpm e2e:server -- --reporter=verbose
+```
+
+### Code Quality
+
+- `lint`: Run ESLint on all files
+- `lint:check`: Check for ESLint errors with zero warnings allowed
+- `lint:fix`: Fix auto-fixable ESLint issues
+- `format`: Format code using Prettier
+- `format:check`: Check code formatting
+
+### Utility
+
+- `clean`: Clean build artifacts and cache
+
 ## Docker and Docker Compose
 
 The DMR system can be easily deployed using Docker and Docker Compose. The repository includes Docker configurations for all components.
@@ -93,8 +134,9 @@ You can test the whole flow of the solution this way:
 
 1. Install [ngrok](https://ngrok.com) and run it with `ngrok http http://localhost:8080`.
 2. Copy the URL provided by ngrok and set it as `OUTGOING_MESSAGE_ENDPOINT` for `dmr-agent-a` in `docker-compose.yml`.
-3. Run `docker compose up -d`.
-4. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
+3. Run a simple server to read messages sent to the ngrok tunnel: `python3 -m http.server 8080`.
+4. Run `docker compose up -d`.
+5. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
 
 ```bash
 curl -X POST http://localhost:8074/v1/messages \
@@ -122,7 +164,7 @@ curl -X POST http://localhost:8074/v1/messages \
   }'
 ```
 
-5. `dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You should see the message in the ngrok tunnel.
+`dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You should see the message sent to the ngrok tunnel.
 
 ## Environment Variables
 
@@ -241,7 +283,7 @@ Messages endpoint supports versioning. The `v1` version message JSON structure i
 }
 ```
 
-## RabbitMQ
+## RabbitMQ details
 
 ### Queues
 
@@ -525,46 +567,3 @@ Suggested alert rules:
     summary: "RabbitMQ node low disk space"
     description: "Less than 10 GB disk free. Could lead to message persistence issues."
 ```
-
-## Local development
-
-For development purposes, there is also a simplified docker-compose file in the dmr-server directory: [`apps/dmr-server/docker-compose.yml`](apps/dmr-server/docker-compose.yml) which only sets up RabbitMQ for local development.
-
-### Development
-
-- `start:server`: Start the DMR server in development mode
-- `start:agent`: Start the DMR agent in development mode
-
-### Building
-
-- `build`: Build all applications
-- `build:server`: Build only the DMR server
-- `build:agent`: Build only the DMR agent
-
-### Testing
-
-- `test`: Run tests for all applications
-- `test:server`: Run tests for DMR server
-- `test:agent`: Run tests for DMR agent
-- `e2e`: Run end-to-end tests for all applications
-- `e2e:server`: Run end-to-end tests for DMR server
-- `e2e:agent`: Run end-to-end tests for DMR agent
-
-For detailed test output, you can add the `--reporter=verbose` flag to any test command:
-
-```bash
-pnpm test:server -- --reporter=verbose
-pnpm e2e:server -- --reporter=verbose
-```
-
-### Code Quality
-
-- `lint`: Run ESLint on all files
-- `lint:check`: Check for ESLint errors with zero warnings allowed
-- `lint:fix`: Fix auto-fixable ESLint issues
-- `format`: Format code using Prettier
-- `format:check`: Check code formatting
-
-### Utility
-
-- `clean`: Clean build artifacts and cache
