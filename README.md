@@ -92,10 +92,7 @@ pnpm start:agent
 
 - `pnpm test:server:log`: Run tests for DMR server
 - `pnpm test:agent:log`: Run tests for DMR agent
-<!-- todo below -->
-- `e2e`: Run end-to-end tests for all applications
-- `e2e:server`: Run end-to-end tests for DMR server
-- `e2e:agent`: Run end-to-end tests for DMR agent
+- `pnpm e2e:full`: Run complete end-to-end test cycle (build, test, cleanup). The e2e tests have a fairly complex set up, more details in [e2e Readme](./apps/tests/e2e/README.md).
 
 ### Code Quality
 
