@@ -58,7 +58,6 @@ So the goal is to build a system that can efficiently and securely forward quest
 - There can be several instances of DMR server running, depending on load.
 - In the future, can potentially be extended to perform operations — like applying policies — on incoming and outgoing messages.
 - Includes support for Prometheus-based monitoring to help track the real-time health and behavior of the DMR server, specifically around WebSocket activity and message processing.
-- **Metrics endpoint**: [`http://localhost:${PORT}/metrics`](http://localhost:PORT/metrics) — compatible with Prometheus.
 
 ### RabbitMQ
 
@@ -313,7 +312,11 @@ Can be set up using [RabbitMQ Cluster Kubernetes Operator](https://www.rabbitmq.
 
 ## Prometheus
 
-### DMR server
+### DMR Server Prometheus
+
+<!-- todo below add normal -->
+
+**Metrics endpoint**: [`http://localhost:${PORT}/metrics`](http://localhost:PORT/metrics) — compatible with Prometheus.
 
 List of metrics:
 
@@ -380,7 +383,7 @@ groups:
         summary: '95th percentile message routing time exceeds 500ms'
 ```
 
-### DMR agent
+### DMR Agent Prometheus
 
 List of metrics:
 
@@ -462,7 +465,7 @@ groups:
             More than 1 HTTP error/sec from DMR Agent (4xx or 5xx responses)
 ```
 
-### RabbitMQ
+### RabbitMQ Prometheus
 
 - <https://www.rabbitmq.com/kubernetes/operator/operator-monitoring>
 - <https://www.rabbitmq.com/docs/prometheus>
