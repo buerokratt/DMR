@@ -1,5 +1,5 @@
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
-import { IAgent } from '../interfaces/agent.interface';
+import { IAgent } from '../interfaces';
 
 export class AgentDto implements IAgent {
   @IsUUID()
