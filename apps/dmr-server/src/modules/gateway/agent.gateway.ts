@@ -187,11 +187,15 @@ export class AgentGateway
 
   @OnEvent(DmrServerEvent.UPDATED)
   async onAgentConfigUpdate(data: CentOpsConfigurationDifference): Promise<void> {
-    this.server.emit(AgentEventNames.PARTIAL_AGENT_LIST, [...data.added, ...data.deleted]);
+    const payload = [...data.added, ...data.deleted];
 
-    this.logger.log('Agent configurations updated and emitted to all connected clients');
+    if (payload.length !== 0) {
+      this.server.emit(AgentEventNames.PARTIAL_AGENT_LIST, payload);
 
-    await this.validateActiveConnections(data);
+      this.logger.log('Agent configurations updated and emitted to all connected clients');
+
+      await this.validateActiveConnections(data);
+    }
   }
 
   private async validateActiveConnections(data: CentOpsConfigurationDifference): Promise<void> {
