@@ -162,7 +162,7 @@ Below is a list of all environment variables used by the DMR system, organized b
 
 | Variable                                      | Description                                                                                                                                                          | Required | Default Value         |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------- |
-| `PORT`                                        | Port on which the DMR server will run                                                                                                                                |          | `5000`                |
+| `PORT`                                        | Port on which the DMR Server will run                                                                                                                                |          | `5000`                |
 | `ENVIRONMENT`                                 | NodeJS Runtime environment. **Should be set to `production` when deployed to ANY environment, including test environments.**                                         |          | `development`         |
 | `LOGGER_COLORS`                               | Enable colored logs. **Strongly suggest to disable when deployed.**                                                                                                  |          | `true`                |
 | `LOGGER_LOG_LEVELS`                           | Comma-separated log levels to output                                                                                                                                 |          | `error,warn,log`      |
@@ -177,7 +177,8 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `RABBITMQ_DEFAULT_TTL`                        | Default message TTL (ms) for normal agent queues                                                                                                                     |          | `300000` (5 minutes)  |
 | `RABBITMQ_DEFAULT_DLQ_TTL`                    | TTL (ms) for messages in agent dead letter queues (DLQs)                                                                                                             |          | `86400000` (24 hours) |
 | `RABBITMQ_VALIDATION_FAILURES_TTL`            | TTL (ms) for messages in validation failures queue                                                                                                                   |          | `86400000` (24 hours) |
-| `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts from DMR server to RabbitMQ                                                                                                  |          | `5000` (5 seconds)    |
+| `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts from DMR Server to RabbitMQ                                                                                                  |          | `5000` (5 seconds)    |
+| `MESSAGE_DELIVERY_TIMEOUT_MS`                 | Timeout (ms) for forwarding outgoing messages to DMR Agent.                                                                                                          |          | `2000`                |
 
 #### CentOps mock
 
@@ -311,9 +312,7 @@ Can be set up using [RabbitMQ Cluster Kubernetes Operator](https://www.rabbitmq.
 
 ### DMR Server Prometheus
 
-<!-- todo below add normal -->
-
-**Metrics endpoint**: [`http://localhost:${PORT}/metrics`](http://localhost:PORT/metrics) — compatible with Prometheus.
+**Metrics endpoint** is `/metrics`.
 
 List of metrics:
 
@@ -381,6 +380,8 @@ groups:
 ```
 
 ### DMR Agent Prometheus
+
+**Metrics endpoint** is `/metrics`.
 
 List of metrics:
 
@@ -463,6 +464,8 @@ groups:
 ```
 
 ### RabbitMQ Prometheus
+
+**Metrics endpoint** is `/metrics`.
 
 - <https://www.rabbitmq.com/kubernetes/operator/operator-monitoring>
 - <https://www.rabbitmq.com/docs/prometheus>
