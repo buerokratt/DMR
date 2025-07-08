@@ -882,7 +882,7 @@ describe('AgentGateway', () => {
       mockRabbitMQService.unsubscribe.mockResolvedValue(undefined);
     });
 
-    it('should emit partial agent list and validate connections', async () => {
+    it('should not emit or validate if no added or deleted agents', async () => {
       const mockDifference = {
         added: [],
         deleted: [],
@@ -894,7 +894,63 @@ describe('AgentGateway', () => {
 
       await gateway.onAgentConfigUpdate(mockDifference);
 
-      expect(serverMock.emit).toHaveBeenCalledWith(AgentEventNames.PARTIAL_AGENT_LIST, []);
+      expect(serverMock.emit).not.toHaveBeenCalled();
+      expect(validateSpy).not.toHaveBeenCalled();
+    });
+
+    it('should emit and validate if there are added or deleted agents', async () => {
+      const mockDifference = {
+        added: [
+          {
+            id: 'abc-123',
+            name: 'Agent X',
+            authenticationCertificate: 'cert-xyz',
+            createdAt: '2023-01-01T00:00:00Z',
+            updatedAt: '2023-01-02T00:00:00Z',
+          },
+        ],
+        deleted: [],
+        certificateChanged: [],
+      };
+
+      const validateSpy = vi.spyOn(gateway as any, 'validateActiveConnections');
+      validateSpy.mockResolvedValue(undefined);
+
+      await gateway.onAgentConfigUpdate(mockDifference);
+
+      expect(serverMock.emit).toHaveBeenCalledWith(
+        AgentEventNames.PARTIAL_AGENT_LIST,
+        mockDifference.added,
+      );
+      expect(validateSpy).toHaveBeenCalledWith(mockDifference);
+    });
+
+    it('should emit and validate when deleted agents exist', async () => {
+      const mockDifference = {
+        added: [],
+        deleted: [
+          {
+            id: 'deleted-456',
+            name: 'Agent Y',
+            authenticationCertificate: 'cert-old',
+            createdAt: '2022-05-01T00:00:00Z',
+            updatedAt: '2022-06-01T00:00:00Z',
+            deleted: true,
+          },
+        ],
+        certificateChanged: [],
+      };
+
+      const validateSpy = vi
+        .spyOn(gateway as any, 'validateActiveConnections')
+        .mockResolvedValue(undefined);
+
+      await gateway.onAgentConfigUpdate(mockDifference);
+
+      expect(serverMock.emit).toHaveBeenCalledWith(
+        AgentEventNames.PARTIAL_AGENT_LIST,
+        mockDifference.deleted,
+      );
       expect(validateSpy).toHaveBeenCalledWith(mockDifference);
     });
 
