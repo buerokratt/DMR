@@ -52,6 +52,7 @@ services:
       - RABBITMQ_DEFAULT_PASS=pass
       - RABBITMQ_VALIDATION_FAILURES_TTL=86400000
       - RABBITMQ_DEFAULT_MANAGEMENT_UI_URI=http://rabbitmq:15672
+      - MESSAGE_DELIVERY_TIMEOUT_MS=2000
       # For CentOps mock
       - MSW_ENABLED=true # Enables CentOps mock
       - NODE_TLS_REJECT_UNAUTHORIZED=0
