@@ -106,7 +106,7 @@ pnpm start:agent
 
 The DMR system can be easily deployed using Docker and Docker Compose. The repository includes Docker configurations for all components.
 
-### Docker Files
+### Dockerfiles
 
 - DMR Server Dockerfile: [`apps/dmr-server/Dockerfile`](apps/dmr-server/Dockerfile)
 - DMR Agent Dockerfile: [`apps/dmr-agent/Dockerfile`](apps/dmr-agent/Dockerfile)
