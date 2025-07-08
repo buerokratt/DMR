@@ -161,13 +161,17 @@ groups:
 
 List of metrics:
 
-- **`dmr_http_requests_total`** | `counter` | `method, route, status`
+- **`dmr_http_requests_total`** | `counter` | `method, route`
   Total HTTP requests handled
+
 - **`dmr_http_request_duration_seconds`** | `histogram` | `method, route, status`
   HTTP request processing time
 
-- **`dmr_http_errors_total` | `counter`** | `method, route`
+- **`dmr_http_errors_total` | `counter`** | `method, route, status`
   Count of error responses (4xx/5xx)
+
+- **`dmr_http_success_total` | `counter`** | `method, route, status`
+  Count of success responses (2xx)
 
 - **`dmr_agent_socket_connection_active`** | `gauge`
   Current number of active Socket.IO connections
