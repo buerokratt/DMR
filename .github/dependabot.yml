@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+      time: '00:00'
+      timezone: 'Europe/Tallinn'
+    labels:
+      - 'dependencies'
+    open-pull-requests-limit: 10
+    target-branch: 'dev'
+    pull-request-branch-name:
+      separator: '/'
+    groups:
+      nx:
+        patterns:
+          - '@nx/*'
+          - '@nrwl/*'
+      nestjs:
+        patterns:
+          - '@nestjs/*'
+      typescript-eslint:
+        patterns:
+          - '@typescript-eslint/*'
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
