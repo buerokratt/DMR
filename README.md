@@ -127,7 +127,7 @@ docker compose up -d
 You can test the whole flow of the solution this way:
 
 1. Run `docker compose up -d`.
-2. Run a simple server to read messages coming to `OUTGOING_MESSAGE_ENDPOINT`: `node scripts/test-server.js`. This emulates an external service in agent cluster.
+2. Run `node scripts/test-server.js`. This starts a simple server to read messages coming to `OUTGOING_MESSAGE_ENDPOINT`. It emulates an external service in Agent A cluster.
 3. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
 
 ```bash
