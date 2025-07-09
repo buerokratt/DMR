@@ -24,6 +24,8 @@ jobs:
           git config --global user.name "dependabot-autoformat"
           git config --global user.email "action@github.com"
            
+          git add .
+
           if ! git diff --quiet; then
            git commit -am "chore: autoformat (via CI)"
            git push
