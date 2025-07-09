@@ -16,6 +16,8 @@ updates:
     groups:
       nx:
         patterns:
+          - 'nx'
+          - 'nx*'
           - '@nx/*'
           - '@nrwl/*'
       nestjs:
