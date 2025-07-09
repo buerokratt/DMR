@@ -1,0 +1,37 @@
+name: Auto Format Dependabot PR
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - dev
+
+jobs:
+  auto-format:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format
+
+      - name: Commit and push formatted code
+        run: |
+          git config user.name "dependabot-autoformat"
+          git config user.email "action@github.com"
+          git commit -am "chore: autoformat (via CI)"
+          git push
+        continue-on-error: true
