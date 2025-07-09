@@ -81,7 +81,8 @@ nvm install
 corepack enable pnpm
 corepack up
 pnpm install
-cp .env.example .env
+cp apps/dmr-server/.env.example apps/dmr-server/.env
+cp apps/dmr-agent/.env.example apps/dmr-agent/.env
 ```
 
 ### Running
