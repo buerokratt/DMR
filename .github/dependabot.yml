@@ -1,6 +1,5 @@
 version: 2
 updates:
-  # Workspace dependencies
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
