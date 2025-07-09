@@ -320,27 +320,20 @@ List of metrics:
 
 - **`dmr_socket_connections_active`** | `gauge`
   Current number of active Socket.IO connections
-
 - **`dmr_socket_connections_total`** | `counter`
   Total number of established connections
-
 - **`dmr_socket_disconnections_total`** | `counter`
   Total number of disconnections
-
 - **`dmr_socket_connection_duration_seconds`** | `histogram`
   Duration of a socket connection session
-
 - **`dmr_socket_errors_total`** | `counter`
   Total number of connection errors
-
 - **`dmr_socket_events_received_total`** | `counter`
   Total events received from clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_socket_events_sent_total`** | `counter`
   Total events sent to clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_message_processing_duration_seconds`** | `histogram`
   Time to process/forward a single message
 
@@ -351,7 +344,6 @@ groups:
   - name: dmr-server-alerts
     rules:
       # Too many disconnected clients suddenly (spike detection)
-
       - alert: DMRHighDisconnectionRate
         expr: increase(dmr_socket_disconnections_total[5m]) > 100
         for: 2m
@@ -361,7 +353,6 @@ groups:
         summary: 'High rate of disconnections in DMR Server'
 
       # Low number of active connections (possible outage)
-
       - alert: DMRServerSocketsDown
         expr: dmr_socket_connections_active< 1
         for: 1m
@@ -371,7 +362,6 @@ groups:
         summary: 'No active socket connections detected on DMR Server'
 
       # Slow message routing
-
       - alert: DMRServerMessageRoutingLatencyHigh
         expr: histogram_quantile(0.95, rate(dmr_message_processing_duration_seconds[5m])) > 0.5
         for: 2m
@@ -389,33 +379,24 @@ List of metrics:
 
 - **`dmr_http_requests_total`** | `counter` | `method, route`
   Total HTTP requests handled
-
 - **`dmr_http_request_duration_seconds`** | `histogram` | `method, route, status`
   HTTP request processing time
-
 - **`dmr_http_errors_total` | `counter`** | `method, route, status`
   Count of error responses (4xx/5xx)
-
 - **`dmr_http_success_total` | `counter`** | `method, route, status`
   Count of success responses (2xx)
-
 - **`dmr_agent_socket_connection_active`** | `gauge`
   Current number of active Socket.IO connections
-
 - **`dmr_socket_connection_duration_seconds`** | `histogram`
   Duration of a socket connection session
-
 - **`dmr_socket_errors_total`** | `counter`
   Total number of connection errors
-
 - **`dmr_socket_events_received_total`** | `counter`
   Total events received from clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_socket_events_sent_total`** | `counter`
   Total events sent to clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_message_processing_duration_seconds`** | `histogram`
   Time to process/forward a single message
 
@@ -480,43 +461,30 @@ Suggested metrics:
 
 - **`rabbitmq_queue_messages_ready`** | `gauge`
   number of messages ready for delivery
-
 - **`rabbitmq_queue_messages_unacknowledged`** | `gauge`
   number of messages delivered to consumers but not yet acknowledged
-
 - **`rabbitmq_queue_messages_total`** | `counter`
   total number of messages published to the queue (ready + unacknowledged)
-
 - **`rabbitmq_connections`** | `gauge`
   current number of open connections
-
 - **`rabbitmq_channels`** | `gauge`
   current number of open AMQP channels
-
 - **`rabbitmq_queue_memory_usage`** | `gauge`
   memory used by individual queues
-
 - **`rabbitmq_node_memory_used_bytes`** | `gauge`
   total memory used by the RabbitMQ node
-
 - **`rabbitmq_node_disk_free`** | `gauge`
   disk space remaining on the node
-
 - **`rabbitmq_node_running`** | `gauge`
   node running status (1 = up, 0 = down)
-
 - **`rabbitmq_erlang_processes`** | `gauge`
   number of Erlang processes currently in use
-
 - **`rabbitmq_vm_memory_limit`** | `gauge`
   memory limit of the Erlang VM
-
 - **`rabbitmq_message_stats_publish`** | `counter`
   total number of messages published
-
 - **`rabbitmq_message_stats_ack`** | `counter`
   total number of messages acknowledged
-
 - **`rabbitmq_message_stats_delivery_get`** | `counter`
   total number of messages delivered or fetched from queues
 
