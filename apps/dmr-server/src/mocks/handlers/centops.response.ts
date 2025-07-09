@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
+// Mocked per https://github.com/buerokratt/CentOps/issues/263
 export const handlers = [
   http.get(process.env.CENTOPS_CONFIGURATION_URL as string, () => {
     return HttpResponse.json({
