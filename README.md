@@ -92,17 +92,9 @@ pnpm start:agent
 
 - `pnpm test:server:log`: Run tests for DMR server
 - `pnpm test:agent:log`: Run tests for DMR agent
-- `pnpm e2e:full`: Run complete end-to-end test cycle (build, test, cleanup)
-
-For detailed information about e2e tests, including:
-
-- Service configurations and ports
-- Environment variables
-- Test scenarios and timeouts
-- Troubleshooting guide
-- Health check endpoints
-
-Please refer to the dedicated [e2e test README](./apps/tests/e2e/README.md).
+- `pnpm integration:server:log`: Run integration tests for DMR server
+- `pnpm integration:agent:log`: Run integration tests for DMR agent
+- `pnpm e2e:full`: Run complete end-to-end test cycle (build, test, cleanup). For detailed information about e2e tests, see [e2e test README](./apps/tests/e2e/README.md).
 
 ### Code Quality
 
