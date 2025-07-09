@@ -17,7 +17,6 @@ jobs:
           ref: ${{ github.head_ref }}
       - uses: ./.github/actions/setup
 
-      - run: pnpm install --frozen-lockfile
       - run: pnpm format
 
       - name: Commit and push formatted code
