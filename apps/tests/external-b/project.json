@@ -4,6 +4,7 @@
   "sourceRoot": "apps/tests/external-b/src",
   "projectType": "application",
   "tags": [],
+  "implicitDependencies": ["shared"],
   "targets": {
     "e2e": {
       "executor": "@nx/vite:test",

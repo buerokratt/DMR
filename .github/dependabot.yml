@@ -1,6 +1,5 @@
 version: 2
 updates:
-  # Workspace dependencies
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
@@ -16,6 +15,8 @@ updates:
     groups:
       nx:
         patterns:
+          - 'nx'
+          - 'nx*'
           - '@nx/*'
           - '@nrwl/*'
       nestjs:

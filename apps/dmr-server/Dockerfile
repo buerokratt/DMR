@@ -16,6 +16,6 @@ COPY libs ./libs
 
 RUN pnpm run build:server
 
-EXPOSE 5000
+EXPOSE 8075
 
 CMD ["node", "dist/apps/dmr-server/main.js"]

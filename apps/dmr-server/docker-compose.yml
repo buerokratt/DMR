@@ -5,7 +5,7 @@ services:
     restart: always
     ports:
       - 5672:5672
-      - 15672:15672
+      - 8071:15672
     env_file:
       - .env
     configs:

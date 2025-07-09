@@ -16,7 +16,7 @@ const variables = Utils.validateObject(
     loggerColors: process.env.LOGGER_COLORS === 'true',
   },
   {
-    port: Joi.number().default(5000),
+    port: Joi.number().default(8077),
     environment: Joi.string().valid('development', 'production').default('development'),
     loggerLogLevels: Joi.array()
       .items(Joi.string().valid('log', 'error', 'warn', 'debug', 'verbose'))

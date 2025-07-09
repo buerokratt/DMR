@@ -6,7 +6,7 @@ on:
     types: [opened, ready_for_review, reopened, synchronize]
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.ref }}-checks
   cancel-in-progress: true
 
 jobs:

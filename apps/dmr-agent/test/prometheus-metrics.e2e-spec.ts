@@ -4,7 +4,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 
-describe('WebSocket Metrics (e2e)', () => {
+describe('Prometheus Metrics (e2e)', () => {
   let app: INestApplication;
   let metricsEndpoint: string;
   let messagesEndpoint: string;

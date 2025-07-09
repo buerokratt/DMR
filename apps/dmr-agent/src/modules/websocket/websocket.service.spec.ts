@@ -69,9 +69,10 @@ describe('WebsocketService', () => {
           useValue: {
             reconnectionDelayMin: 1000,
             reconnectionDelayMax: 5000,
-            url: 'http://localhost:3000',
+            url: 'http://localhost:8075',
             namespace: 'namespace',
             messageDeliveryTimeoutMs: 2000,
+            ackTimeout: 10000,
           },
         },
         {
