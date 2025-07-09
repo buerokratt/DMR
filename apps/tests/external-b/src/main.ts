@@ -79,6 +79,11 @@ const getLastMessage = (_req: Request, res: Response): void => {
 app.post('/api/messages', handleMessage);
 app.get('/api/messages/last', getLastMessage);
 
+// Health check
+app.get('/health', (_, response) => {
+  response.status(200).json({ status: 'healthy', service: 'external-service-a' });
+});
+
 app.listen(port, host, () => {
   console.log(`External Service B listening at http://${host}:${port}`);
 });
