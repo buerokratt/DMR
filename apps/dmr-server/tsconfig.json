@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "files": [],
-  "include": [],
+  "include": ["**/*.spec.ts", "**/*.test.ts", "**/*.e2e-spec.ts"],
   "references": [
     {
       "path": "./tsconfig.app.json"

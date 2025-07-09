@@ -170,7 +170,7 @@ export class CentOpsService implements OnModuleInit {
         );
       }
 
-      this.logger.log('CentOps configuration updated and stored in memory.');
+      this.logger.debug('CentOps configuration updated and stored in memory.');
 
       return newConfigurations;
     } catch (error: unknown) {
