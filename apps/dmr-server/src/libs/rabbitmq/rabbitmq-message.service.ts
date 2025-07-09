@@ -19,12 +19,23 @@ export class RabbitMQMessageService implements OnModuleInit {
     private readonly rabbitMQService: RabbitMQService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    await this.setupValidationFailuresQueueWithRetry();
+  onModuleInit(): void {
+    // Delay validation queue setup to allow RabbitMQ connection to establish
+    setTimeout(() => {
+      this.setupValidationFailuresQueueWithRetry().catch((error) => {
+        this.logger.error('Failed to setup validation failures queue during initialization', error);
+      });
+    }, 5000);
   }
 
   private async setupValidationFailuresQueueWithRetry(retries = 5, delay = 5000): Promise<void> {
     try {
+      // Wait for RabbitMQ connection before setting up queues
+      const connected = await this.rabbitMQService.waitForConnection();
+      if (!connected) {
+        throw new Error('RabbitMQ connection not established within timeout');
+      }
+
       await this.setupValidationFailuresQueue();
     } catch (error) {
       if (retries > 0) {
@@ -142,6 +153,20 @@ export class RabbitMQMessageService implements OnModuleInit {
       if (!channel) {
         this.logger.error('RabbitMQ channel is not available');
         return false;
+      }
+
+      // Ensure validation queue exists before trying to send to it
+      const queueExists = await this.rabbitMQService.checkQueue(this.VALIDATION_FAILURES_QUEUE);
+      if (!queueExists) {
+        this.logger.log('Validation failures queue does not exist, creating it now');
+        const success = await this.rabbitMQService.setupQueueWithoutDLQ(
+          this.VALIDATION_FAILURES_QUEUE,
+          this.rabbitMQConfig.validationFailuresTTL,
+        );
+        if (!success) {
+          this.logger.error('Failed to create validation failures queue');
+          return false;
+        }
       }
 
       const messageId = this.extractMessageId(originalMessage);

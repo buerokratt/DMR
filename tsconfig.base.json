@@ -19,5 +19,5 @@
       "@dmr/shared": ["libs/shared/src/index.ts"]
     }
   },
-  "exclude": ["node_modules", "tmp"]
+  "exclude": ["node_modules", "tmp", "scripts/test-server.js"]
 }

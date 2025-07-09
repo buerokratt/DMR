@@ -1,6 +1,7 @@
 const dmr_socket_connection_active = 'dmr_socket_connection_active';
 const dmr_http_requests_total = 'dmr_http_requests_total';
 const dmr_http_request_duration_seconds = 'dmr_http_request_duration_seconds';
+const dmr_http_success_total = 'dmr_http_success_total';
 const dmr_http_errors_total = 'dmr_http_errors_total';
 const dmr_socket_connection_duration_seconds = 'dmr_socket_connection_duration_seconds';
 const dmr_socket_errors_total = 'dmr_socket_errors_total';
@@ -15,6 +16,8 @@ export const Metrics = {
   dmrHttpRequestTotalHelp: dmr_http_requests_total + '_help',
   dmrHttpErrorsTotal: dmr_http_errors_total,
   dmrHttpErrorsTotalHelp: dmr_http_errors_total + '_help',
+  dmrHttpSuccessTotal: dmr_http_success_total,
+  dmrHttpSuccessTotalHelp: dmr_http_success_total + '_help',
   dmrHttpRequestDurationSeconds: dmr_http_request_duration_seconds,
   dmrHttpRequestDurationSecondsHelp: dmr_http_request_duration_seconds + '_help',
   dmrSocketConnectionDurationSeconds: dmr_socket_connection_duration_seconds,

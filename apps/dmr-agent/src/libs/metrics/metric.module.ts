@@ -25,12 +25,17 @@ import { Metrics } from './metrics';
     makeCounterProvider({
       name: Metrics.dmrHttpRequestTotal,
       help: Metrics.dmrHttpRequestTotalHelp,
+      labelNames: ['method', 'route'],
+    }),
+    makeCounterProvider({
+      name: Metrics.dmrHttpSuccessTotal,
+      help: Metrics.dmrHttpSuccessTotalHelp,
       labelNames: ['method', 'route', 'status'],
     }),
     makeCounterProvider({
       name: Metrics.dmrHttpErrorsTotal,
       help: Metrics.dmrHttpErrorsTotalHelp,
-      labelNames: ['method', 'route'],
+      labelNames: ['method', 'route', 'status'],
     }),
     makeHistogramProvider({
       name: Metrics.dmrHttpRequestDurationSeconds,

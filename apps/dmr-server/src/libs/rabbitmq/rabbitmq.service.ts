@@ -112,16 +112,16 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     this.schedulerRegistry.addInterval(this.RECONNECT_INTERVAL_NAME, interval);
   }
 
-  async setupQueue(queueName: string, ttl?: number, retryAttempts = 3): Promise<boolean> {
+  async setupQueue(queueName: string, ttl?: number, retryAttempts = 5): Promise<boolean> {
     const channel = this.channel;
 
     if (!channel) {
       if (retryAttempts > 0) {
         this.logger.warn(
-          `RabbitMQ channel not available for queue ${queueName}, retrying in 2s... (${retryAttempts} attempts left)`,
+          `RabbitMQ channel not available for queue ${queueName}, retrying in 3s... (${retryAttempts} attempts left)`,
         );
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
         return this.setupQueue(queueName, ttl, retryAttempts - 1);
       }
@@ -405,5 +405,21 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     }
 
     return this._channel;
+  }
+
+  async waitForConnection(maxWaitTime = 30000, checkInterval = 1000): Promise<boolean> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitTime) {
+      if (this._channel && this._connection) {
+        this.logger.log('RabbitMQ connection established');
+        return true;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
+    }
+
+    this.logger.error('Timeout waiting for RabbitMQ connection');
+    return false;
   }
 }

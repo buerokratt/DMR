@@ -14,6 +14,6 @@ COPY libs ./libs
 
 RUN pnpm run build:agent
 
-EXPOSE 5001
+EXPOSE 8077
 
 CMD ["node", "dist/apps/dmr-agent/main.js"]

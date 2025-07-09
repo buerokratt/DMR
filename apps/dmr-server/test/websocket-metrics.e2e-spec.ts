@@ -7,6 +7,7 @@ import { AppModule } from '../src/app.module';
 import { RabbitMQService } from '../src/libs/rabbitmq';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { CentOpsService } from '../src/modules/centops/centops.service';
+import { AgentConnectionData } from '@dmr/shared';
 
 function createMockJwtWithKidAndSub(kid: string): string {
   const header = {
@@ -50,7 +51,17 @@ describe('WebSocket Metrics (e2e)', () => {
         }),
       })
       .overrideProvider(AuthService)
-      .useValue({ verifyToken: (token: string) => ({ sub: token, cat: Date.now() }) })
+      .useValue({
+        verifyToken: (token: string): AgentConnectionData => ({
+          jwtPayload: {
+            sub: token,
+            cat: Date.now(),
+            iat: 123,
+            exp: 123,
+          },
+          authenticationCertificate: 'certificate',
+        }),
+      })
       .overrideProvider(RabbitMQService)
       .useValue({
         setupQueue: () => true,

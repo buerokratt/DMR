@@ -1,4 +1,10 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import {
+  CallHandler,
+  ExecutionContext,
+  HttpException,
+  Injectable,
+  NestInterceptor,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 import { catchError, tap, throwError } from 'rxjs';
 import { MetricService } from '../../libs/metrics';
@@ -14,6 +20,11 @@ export class HttpMetricsInterceptor implements NestInterceptor {
     const method = request.method;
     const route = (request.route as unknown as { path?: string })?.path || request.url;
 
+    this.metricService.httpRequestTotalCounter.inc({
+      route,
+      method,
+    });
+
     const stopTimer = this.metricService.httpRequestDurationSecondsHistogram.startTimer({
       route,
       method,
@@ -23,7 +34,7 @@ export class HttpMetricsInterceptor implements NestInterceptor {
       tap(() => {
         const status = response.statusCode.toString();
 
-        this.metricService.httpRequestTotalCounter.inc({
+        this.metricService.httpSuccessTotalCounter.inc({
           route,
           method,
           status,
@@ -32,11 +43,12 @@ export class HttpMetricsInterceptor implements NestInterceptor {
         stopTimer({ status });
       }),
       catchError((error: Error) => {
-        const status = response.statusCode.toString();
+        const status = error instanceof HttpException ? error.getStatus().toString() : '500';
 
         this.metricService.httpErrorsTotalCounter.inc({
           route,
           method,
+          status,
         });
 
         stopTimer({ status });

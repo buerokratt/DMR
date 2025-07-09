@@ -10,6 +10,8 @@ export class MetricService {
     private readonly _httpRequestTotalCounter: Counter<string>,
     @InjectMetric(Metrics.dmrHttpErrorsTotal)
     private readonly _httpErrorsTotalCounter: Counter<string>,
+    @InjectMetric(Metrics.dmrHttpSuccessTotal)
+    private readonly _httpSuccessTotalCounter: Counter<string>,
     @InjectMetric(Metrics.dmrHttpRequestDurationSeconds)
     private readonly _httpRequestDurationSecondsHistogram: Histogram<string>,
     @InjectMetric(Metrics.dmrSocketErrorsTotal)
@@ -28,6 +30,10 @@ export class MetricService {
 
   get httpRequestTotalCounter(): Counter<string> {
     return this._httpRequestTotalCounter;
+  }
+
+  get httpSuccessTotalCounter(): Counter<string> {
+    return this._httpSuccessTotalCounter;
   }
 
   get httpErrorsTotalCounter(): Counter<string> {

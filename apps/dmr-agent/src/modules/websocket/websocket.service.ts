@@ -53,6 +53,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
 
     this.socket.on('connect', () => {
       startTime = Date.now();
+
       this.metricService.activeConnectionStatusGauge.inc(1);
       this.reconnectionAttempts = 0;
 

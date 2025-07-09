@@ -16,9 +16,10 @@ const variables = Utils.validateObject(
     loggerLogLevels: (process.env.LOGGER_LOG_LEVELS?.split(',') as LogLevel[]) || undefined,
     loggerColors: process.env.LOGGER_COLORS === 'true',
     mswEnable: process.env.MSW_ENABLED === 'true',
+    messageDeliveryTimeoutMs: Number(process.env.MESSAGE_DELIVERY_TIMEOUT_MS),
   },
   {
-    port: Joi.number().default(5000),
+    port: Joi.number().default(8075),
     websocketMaxDuration: Joi.number().default(120000),
     websocketNamespace: Joi.string().default('/v1/dmr-agent-events'),
     environment: Joi.string().valid('development', 'production').default('development'),
@@ -27,6 +28,7 @@ const variables = Utils.validateObject(
       .default(['error', 'warn', 'log']),
     loggerColors: Joi.boolean().default(false),
     mswEnable: Joi.boolean().default(false),
+    messageDeliveryTimeoutMs: Joi.number().default(2000),
   },
 );
 

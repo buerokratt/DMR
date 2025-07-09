@@ -1,0 +1,35 @@
+name: Auto Format Dependabot PR
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - dev
+
+jobs:
+  auto-format:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: ./.github/actions/setup
+
+      - run: pnpm format
+
+      - name: Commit and push formatted code
+        run: |
+          git config --global user.name "dependabot-autoformat"
+          git config --global user.email "action@github.com"
+           
+          git add .
+
+          if ! git diff --quiet; then
+           git commit -am "chore: autoformat (via CI)"
+           git push
+          else
+           echo "No changes to commit"
+          fi
+        continue-on-error: true

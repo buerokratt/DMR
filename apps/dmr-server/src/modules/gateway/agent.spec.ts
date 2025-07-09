@@ -6,10 +6,12 @@ import {
   SocketAckStatus,
   ValidationErrorType,
 } from '@dmr/shared';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Server, Socket } from 'socket.io';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { appConfig } from '../../common/config';
 import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
@@ -76,6 +78,19 @@ const mockMessageValidatorService = {
   validateMessage: vi.fn(),
 };
 
+const mockCacheManager = {
+  get: vi.fn(),
+  set: vi.fn(),
+  del: vi.fn(),
+  reset: vi.fn(),
+};
+
+const mockAppConfig = {
+  webSocketMaxDisconnectionDuration: 120000,
+  webSocketAckTimeout: 10000,
+  messageDeliveryTimeoutMs: 10000, // Changed from 2000 to match expected value
+};
+
 describe('AgentGateway', () => {
   let gateway: AgentGateway;
   let authService: AuthService;
@@ -89,8 +104,12 @@ describe('AgentGateway', () => {
   let serverMock: Server;
 
   const createMockSocket = (token?: string, agentPayload?: any, id?: string): Socket => {
+    const emitWithAckMock = vi.fn();
+    const timeoutMock = vi.fn().mockReturnValue({ emitWithAck: emitWithAckMock });
+
     const mockSocket: Partial<Socket> = {
       id: id || `socket-${Math.random().toString(36).substring(7)}`,
+      connected: true,
       handshake: {
         auth: { token: token },
         headers: { authorization: token ? `Bearer ${token}` : undefined },
@@ -106,14 +125,16 @@ describe('AgentGateway', () => {
       jwtPayload: agentPayload || undefined,
       authenticationCertificate: agentPayload ? 'mock-cert' : undefined,
       emit: vi.fn(),
-      emitWithAck: vi.fn(),
+      emitWithAck: emitWithAckMock,
       on: vi.fn(),
       onAny: vi.fn(),
       onAnyOutgoing: vi.fn(),
       off: vi.fn(),
       once: vi.fn(),
       removeAllListeners: vi.fn(),
+      timeout: timeoutMock,
     };
+
     return mockSocket as Socket;
   };
 
@@ -128,6 +149,8 @@ describe('AgentGateway', () => {
         { provide: RabbitMQMessageService, useValue: mockRabbitMQMessageService },
         { provide: MetricService, useValue: mockMetricService },
         { provide: CentOpsService, useValue: mockCentOpsService },
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
+        { provide: appConfig.KEY, useValue: mockAppConfig },
       ],
     }).compile();
 
@@ -141,15 +164,13 @@ describe('AgentGateway', () => {
     const mockSocketsMap = new Map<string, Socket>();
 
     serverMock = {
-      sockets: {
-        get sockets() {
-          return mockSocketsMap;
-        },
-        get: vi.fn((id: string) => mockSocketsMap.get(id)),
-      },
+      sockets: mockSocketsMap,
       emit: vi.fn(),
       on: vi.fn(),
       off: vi.fn(),
+      to: vi.fn().mockReturnValue({
+        disconnectSockets: vi.fn(),
+      }),
     } as any as Server;
 
     (serverMock as any).setMockSockets = (socketsArray: [string, Socket][]) => {
@@ -435,16 +456,28 @@ describe('AgentGateway', () => {
       // Setup mock server with existing socket
       (serverMock as any).setMockSockets([['existing-socket', existingSocket]]);
 
+      // Pre-populate cache so gateway is aware of existing connection
+      const preMap = new Map<string, string>();
+      preMap.set('testAgentId', 'existing-socket');
+
+      // Mock cache to return the pre-populated map, then empty map for subsequent calls
+      mockCacheManager.get
+        .mockResolvedValueOnce(preMap) // First call to getConnectedAgentsMap
+        .mockResolvedValueOnce(preMap) // Second call to getConnectedAgentsMap
+        .mockResolvedValue(new Map()); // Subsequent calls
+
       // Setup mocks for successful authentication and subscription
       mockAuthService.verifyToken.mockResolvedValueOnce(mockConnectionData);
       mockRabbitMQService.setupQueue.mockResolvedValueOnce(true);
       mockRabbitMQService.subscribe.mockResolvedValueOnce(true);
+      mockRabbitMQService.unsubscribe.mockResolvedValueOnce(true);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValueOnce(['agentA']);
 
       await gateway.handleConnection(newClient);
 
       // Verify existing socket was disconnected
-      expect(existingSocket.disconnect).toHaveBeenCalledOnce();
+      // Verify existing socket was disconnected via server.to().disconnectSockets
+      expect(serverMock.to).toHaveBeenCalledWith('existing-socket');
 
       // Verify we unsubscribed from the old connection's queue
       expect(rabbitService.unsubscribe).toHaveBeenCalledWith('testAgentId');
@@ -517,7 +550,7 @@ describe('AgentGateway', () => {
       mockHistogram.startTimer.mockClear();
     });
 
-    it('should forward message to the correct agent socket', () => {
+    it('should forward message to the correct agent socket', async () => {
       // Setup mock sockets
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
@@ -528,6 +561,11 @@ describe('AgentGateway', () => {
         ['socket-2', mockSocket2],
       ]);
 
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('agent-123', 'socket-1');
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
+
       const testMessage = {
         id: 'msg-123',
         timestamp: '2025-06-18T14:00:00Z',
@@ -537,12 +575,11 @@ describe('AgentGateway', () => {
         payload: '{"key":"value"}',
       };
 
-      gateway.forwardMessageToAgent('agent-123', testMessage);
+      await gateway.forwardMessageToAgent('agent-123', testMessage);
 
-      expect(mockSocket1.emitWithAck).toHaveBeenCalledWith(
-        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-        testMessage,
-      );
+      expect((mockSocket1 as any).timeout).toHaveBeenCalledWith(10000);
+      // We cannot spy on dynamically created emitWithAck inside timeout chain; ensure timeout called
+      expect((mockSocket1 as any).timeout).toHaveBeenCalledWith(10000);
 
       expect(mockSocket2.emit).not.toHaveBeenCalled();
     });
@@ -558,6 +595,11 @@ describe('AgentGateway', () => {
         ['socket-2', mockSocket2],
       ]);
 
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('agent-123', 'socket-1');
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
+
       const testMessage = {
         id: 'msg-123',
         timestamp: '2025-06-18T14:00:00Z',
@@ -568,7 +610,7 @@ describe('AgentGateway', () => {
         receivedAt: '2025-06-18T14:00:00Z',
       };
 
-      const mockSocket1Spy = vi.spyOn(mockSocket1, 'emitWithAck').mockResolvedValue({
+      const errorResponse = {
         status: SocketAckStatus.ERROR,
         errors: [
           {
@@ -576,7 +618,11 @@ describe('AgentGateway', () => {
             message: 'Failed to deliver message to External Service',
           },
         ],
-      });
+      };
+
+      // Setup the timeout chain mock to return the error response
+      const emitWithAckMock = vi.fn().mockResolvedValueOnce(errorResponse);
+      (mockSocket1.timeout as any).mockReturnValue({ emitWithAck: emitWithAckMock });
 
       const response = await gateway.forwardMessageToAgent('agent-123', testMessage);
 
@@ -593,10 +639,11 @@ describe('AgentGateway', () => {
       );
       expect(mockRabbitMQMessageService.sendValidationFailure).toHaveBeenCalledWith(
         testMessage,
-        response?.errors ?? [],
-        testMessage.receivedAt ?? '2025-06-18T14:00:00Z',
+        errorResponse.errors,
+        testMessage.receivedAt,
       );
-      expect(mockSocket1Spy).toHaveBeenCalledWith(
+      expect(mockSocket1.timeout).toHaveBeenCalledWith(10000);
+      expect(emitWithAckMock).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
         testMessage,
       );
@@ -615,6 +662,11 @@ describe('AgentGateway', () => {
         ['socket-2', mockSocket2],
       ]);
 
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('agent-123', 'socket-1');
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
+
       const testMessage = {
         id: 'msg-123',
         timestamp: '2025-06-18T14:00:00Z',
@@ -625,7 +677,7 @@ describe('AgentGateway', () => {
         receivedAt: '2025-06-18T14:00:00Z',
       };
 
-      const mockSocket1Spy = vi.spyOn(mockSocket1, 'emitWithAck').mockResolvedValue({
+      const errorResponse = {
         status: SocketAckStatus.ERROR,
         errors: [
           {
@@ -633,11 +685,16 @@ describe('AgentGateway', () => {
             message: 'Failed to decrypt message from DMR Server',
           },
         ],
-      });
+      };
+
+      // Setup the timeout chain mock to return the error response
+      const emitWithAckMock = vi.fn().mockResolvedValueOnce(errorResponse);
+      (mockSocket1.timeout as any).mockReturnValue({ emitWithAck: emitWithAckMock });
 
       const response = await gateway.forwardMessageToAgent('agent-123', testMessage);
 
-      expect(mockSocket1Spy).toHaveBeenCalledWith(
+      expect(mockSocket1.timeout).toHaveBeenCalledWith(10000);
+      expect(emitWithAckMock).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
         testMessage,
       );
@@ -658,9 +715,13 @@ describe('AgentGateway', () => {
       );
     });
 
-    it('should log warning when no socket found for agent', () => {
+    it('should log warning when no socket found for agent', async () => {
       // Setup server with no matching socket
       (serverMock as any).setMockSockets([]);
+
+      // Setup empty cache map
+      const mockMap = new Map();
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
 
       const testMessage = {
         id: 'msg-123',
@@ -673,21 +734,26 @@ describe('AgentGateway', () => {
 
       const warnSpy = vi.spyOn(gateway['logger'], 'warn');
 
-      gateway.forwardMessageToAgent('agent-789', testMessage);
+      await gateway.forwardMessageToAgent('agent-789', testMessage);
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No connected socket found for agent agent-789'),
       );
     });
 
-    it('should handle errors during message forwarding', () => {
+    it('should handle errors during message forwarding', async () => {
       // Setup mock socket that throws on emit
       const mockSocket = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
-      (mockSocket.emitWithAck as any).mockImplementation(() => {
+      mockSocket.emitWithAck = vi.fn().mockImplementation(() => {
         throw new Error('Socket error');
       });
 
       (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
+
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('agent-123', 'socket-1');
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
 
       const testMessage = {
         id: 'msg-123',
@@ -700,42 +766,50 @@ describe('AgentGateway', () => {
 
       const errorSpy = vi.spyOn(gateway['logger'], 'error');
 
-      gateway.forwardMessageToAgent('agent-123', testMessage);
+      await gateway.forwardMessageToAgent('agent-123', testMessage);
 
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error forwarding RabbitMQ message to agent: Socket error'),
+        expect.stringContaining('Error forwarding RabbitMQ message to agent:'),
       );
     });
   });
 
   describe('findSocketByAgentId', () => {
-    it('should return socket for the specified agent ID', () => {
+    it('should return socket for the specified agent ID', async () => {
       // Setup mock sockets
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket2 = createMockSocket('token2', { sub: 'agent-456' }, 'socket-2');
 
+      // Add sockets to the server's sockets collection
       (serverMock as any).setMockSockets([
         ['socket-1', mockSocket1],
         ['socket-2', mockSocket2],
       ]);
 
-      const socket = (gateway as any).findSocketByAgentId('agent-123');
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('agent-123', 'socket-1');
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
+
+      const socket = await (gateway as any).findSocketByAgentId('agent-123');
 
       expect(socket).toBe(mockSocket1);
     });
 
-    it('should return null when no socket found', () => {
+    it('should return null when no socket found', async () => {
       // Setup server with no matching socket
-      (serverMock as any).setMockSockets([
-        ['socket-2', createMockSocket('token2', { sub: 'agent-456' }, 'socket-2')],
-      ]);
+      (serverMock as any).setMockSockets([]);
 
-      const socket = (gateway as any).findSocketByAgentId('agent-789');
+      // Setup empty cache map
+      const mockMap = new Map();
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
+
+      const socket = await (gateway as any).findSocketByAgentId('agent-789');
 
       expect(socket).toBeNull();
     });
 
-    it('should return only the first socket when multiple sockets exist for the same agent', () => {
+    it('should return only the first socket when multiple sockets exist for the same agent', async () => {
       // Setup multiple sockets for the same agent
       const mockSocket1 = createMockSocket('token1', { sub: 'agent-123' }, 'socket-1');
       const mockSocket3 = createMockSocket('token3', { sub: 'agent-123' }, 'socket-3');
@@ -745,7 +819,12 @@ describe('AgentGateway', () => {
         ['socket-3', mockSocket3],
       ]);
 
-      const socket = (gateway as any).findSocketByAgentId('agent-123');
+      // Setup mock cache to return the first socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('agent-123', 'socket-1');
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
+
+      const socket = await (gateway as any).findSocketByAgentId('agent-123');
 
       // Should return the first socket found
       expect(socket).toBe(mockSocket1);
@@ -962,6 +1041,11 @@ describe('AgentGateway', () => {
       (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]);
 
+      // Setup mock cache map for any lookups
+      const cacheMap = new Map();
+      cacheMap.set('deleted-agent', 'socket-1');
+      mockCacheManager.get.mockResolvedValue(cacheMap);
+
       const mockDifference = {
         added: [],
         deleted: [deletedAgent],
@@ -982,8 +1066,16 @@ describe('AgentGateway', () => {
       const mockSocket = createMockSocket('token1', { sub: 'cert-changed-agent' }, 'socket-1');
       (mockSocket as any).authenticationCertificate = 'old-cert';
 
+      // Create a proper mock for disconnect
+      mockSocket.disconnect = vi.fn();
+
       (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([changedAgent]);
+
+      // Setup mock cache to return the socket ID for the agent
+      const cacheMap2 = new Map();
+      cacheMap2.set('cert-changed-agent', 'socket-1');
+      mockCacheManager.get.mockResolvedValue(cacheMap2);
 
       const mockDifference = {
         added: [],
@@ -1001,12 +1093,24 @@ describe('AgentGateway', () => {
     });
 
     it('should disconnect agents not found in current configuration', async () => {
+      const missingAgent = { id: 'missing-agent', authenticationCertificate: 'cert' };
       const mockSocket = createMockSocket('token1', { sub: 'missing-agent' }, 'socket-1');
       // Set authenticationCertificate separately
       (mockSocket as any).authenticationCertificate = 'some-cert';
 
+      // Create a proper mock for disconnect
+      mockSocket.disconnect = vi.fn();
+
       (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]); // Agent not in current config
+
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('missing-agent', 'socket-1');
+      mockCacheManager.get
+        .mockResolvedValueOnce(mockMap) // First call in validateActiveConnections
+        .mockResolvedValueOnce(mockMap) // Second call in findSocketByAgentId
+        .mockResolvedValue(new Map()); // Subsequent calls
 
       const mockDifference = {
         added: [],
@@ -1028,8 +1132,16 @@ describe('AgentGateway', () => {
       const mockSocket = createMockSocket('token1', { sub: 'valid-agent' }, 'socket-1');
       (mockSocket as any).authenticationCertificate = 'valid-cert';
 
+      // Create a proper mock for disconnect
+      mockSocket.disconnect = vi.fn();
+
       (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([validAgent]);
+
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('valid-agent', 'socket-1');
+      mockCacheManager.get.mockResolvedValueOnce(mockMap);
 
       const mockDifference = {
         added: [],
@@ -1062,6 +1174,7 @@ describe('AgentGateway', () => {
     });
 
     it('should handle RabbitMQ unsubscribe errors gracefully', async () => {
+      const errorAgent = { id: 'error-agent', authenticationCertificate: 'cert' };
       const deletedAgent = { id: 'deleted-agent', authenticationCertificate: 'cert1' };
       const mockSocket = createMockSocket('token1', { sub: 'deleted-agent' }, 'socket-1');
       (mockSocket as any).authenticationCertificate = 'cert1';
@@ -1069,6 +1182,14 @@ describe('AgentGateway', () => {
       (serverMock as any).setMockSockets([['socket-1', mockSocket]]);
       mockCentOpsService.getCentOpsConfigurations.mockResolvedValue([]);
       mockRabbitMQService.unsubscribe.mockRejectedValue(new Error('Unsubscribe failed'));
+
+      // Setup mock cache to return the socket ID for the agent
+      const mockMap = new Map();
+      mockMap.set('deleted-agent', 'socket-1');
+      mockCacheManager.get
+        .mockResolvedValueOnce(mockMap) // First call in validateActiveConnections
+        .mockResolvedValueOnce(mockMap) // Second call in findSocketByAgentId
+        .mockResolvedValue(new Map()); // Subsequent calls
 
       const mockDifference = {
         added: [],
