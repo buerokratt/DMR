@@ -128,7 +128,7 @@ You can test the whole flow of the solution this way:
 
 1. Install [ngrok](https://ngrok.com) and run it with `ngrok http http://localhost:8080`.
 2. Copy the URL provided by ngrok and set it as `OUTGOING_MESSAGE_ENDPOINT` for `dmr-agent-a` in `docker-compose.yml`.
-3. Run a simple server to read messages sent to the ngrok tunnel: `node scripts/test-service.js`.
+3. Run a simple server to read messages sent to the ngrok tunnel: `node scripts/test-server.js`.
 4. Run `docker compose up -d`.
 5. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
 

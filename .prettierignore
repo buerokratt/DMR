@@ -3,4 +3,4 @@
 /coverage
 /.nx/cache
 /.nx/workspace-data
-/scripts/test-service.js
+/scripts/test-server.js
