@@ -34,18 +34,21 @@ graph TD
 
 ### Business case
 
-Currently, there is no way to pass questions from one Bürokratt instance to another. This means that if an end-user asks a question that the local Bürokratt instance cannot answer, he will receive no meaningful reply — even if some other Bürokratt instance could answer it.
+Previously, there was no way to pass questions from one Bürokratt instance to another. This meant that if an end-user asks a question the local Bürokratt instance cannot answer, he will receive no meaningful reply. Even if some other Bürokratt instance could answer it.
 
 An example: a user comes to the Tax Authority web, and asks a question about crime, the Tax Authority instance will not be able to answer it. The Police instance **is able** to answer the question but there is no way to forward it.
 
-So the goal is to build a system that can efficiently and securely forward questions and answers between Bürokratt instances.
+The DMR system is a solution to this problem. It allows to efficiently and securely forward questions and answers between Bürokratt instances.
 
 ### DMR agents
 
 - DMR agents run in every client's Bürokratt cluster. They are responsible for forwarding messages to the DMR Server and receiving messages from it in real-time. This is done via a WebSocket connection.
 - DMR agents encrypt and decrypt messages using public-key cryptography. Private keys are delivered to the agents at infrastructure level. Other DMR agents' public keys are distributed by DMR server on establishing a WebSocket connection.
 - Metadata needed to pass the messages along — like sender and recipient IDs — is not encrypted.
-- The DMR agents also expose an API for communicating with other services in the client's Bürokratt cluster.
+- DMR agents also expose a REST API for communicating with other services in the client's Bürokratt cluster:
+  - `/v1/messages` — API endpoint for receiving incoming messages
+  - `OUTGOING_MESSAGE_ENDPOINT` — HTTP endpoint where decrypted messages will be forwarded inside DMR Agent cluster
+- Includes support for Prometheus-based monitoring
 
 ### DMR server
 
@@ -57,15 +60,16 @@ So the goal is to build a system that can efficiently and securely forward quest
 - **Cannot** read the message contents, these are encrypted by the DMR agents.
 - There can be several instances of DMR server running, depending on load.
 - In the future, can potentially be extended to perform operations — like applying policies — on incoming and outgoing messages.
-- Includes support for Prometheus-based monitoring to help track the real-time health and behavior of the DMR server, specifically around WebSocket activity and message processing.
+- Includes support for Prometheus-based monitoring.
 
 ### RabbitMQ
 
 - Has per-Agent message queues.
-- Has a dead letter queue for messages that failed to deliver.
-- Has RabbitMQ UI-based monitoring tools set up.
+- Has per-Agent dead letter queues (DLQs) for messages that failed to deliver.
+- Has a single validation failures queue for messages that failed to validate.
 - Supports RabbitMQ clustering for scalability.
-- <https://www.rabbitmq.com/kubernetes/operator/operator-monitoring>
+- Includes support for Prometheus-based monitoring.
+- See [RabbitMQ details](#rabbitmq-details) below for more information.
 
 ## Local development
 
