@@ -155,7 +155,7 @@ services:
     ports:
       - '8078:8077'
     depends_on:
-      dmr-server-1:
+      dmr-server-2:
         condition: service_healthy
     environment:
       - NODE_ENV=test
@@ -163,7 +163,7 @@ services:
       - ENVIRONMENT=development
       - LOGGER_COLORS=false
       - LOGGER_LOG_LEVELS=error,warn,log
-      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server-1:8075
+      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server-2:8075
       - WEBSOCKET_RECONNECTION_DELAY=100
       - WEBSOCKET_RECONNECTION_DELAY_MAX=500
       - MESSAGE_DELIVERY_TIMEOUT_MS=2000

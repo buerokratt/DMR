@@ -34,18 +34,21 @@ graph TD
 
 ### Business case
 
-Currently, there is no way to pass questions from one Bürokratt instance to another. This means that if an end-user asks a question that the local Bürokratt instance cannot answer, he will receive no meaningful reply — even if some other Bürokratt instance could answer it.
+Previously, there was no way to pass questions from one Bürokratt instance to another. This meant that if an end-user asks a question the local Bürokratt instance cannot answer, he will receive no meaningful reply. Even if some other Bürokratt instance could answer it.
 
 An example: a user comes to the Tax Authority web, and asks a question about crime, the Tax Authority instance will not be able to answer it. The Police instance **is able** to answer the question but there is no way to forward it.
 
-So the goal is to build a system that can efficiently and securely forward questions and answers between Bürokratt instances.
+The DMR system is a solution to this problem. It allows to efficiently and securely forward questions and answers between Bürokratt instances.
 
 ### DMR agents
 
 - DMR agents run in every client's Bürokratt cluster. They are responsible for forwarding messages to the DMR Server and receiving messages from it in real-time. This is done via a WebSocket connection.
 - DMR agents encrypt and decrypt messages using public-key cryptography. Private keys are delivered to the agents at infrastructure level. Other DMR agents' public keys are distributed by DMR server on establishing a WebSocket connection.
 - Metadata needed to pass the messages along — like sender and recipient IDs — is not encrypted.
-- The DMR agents also expose an API for communicating with other services in the client's Bürokratt cluster.
+- DMR agents also expose a REST API for communicating with other services in the client's Bürokratt cluster:
+  - `/v1/messages` — API endpoint for receiving incoming messages
+  - `OUTGOING_MESSAGE_ENDPOINT` — HTTP endpoint where decrypted messages will be forwarded inside DMR Agent cluster
+- Includes support for Prometheus-based monitoring
 
 ### DMR server
 
@@ -57,15 +60,16 @@ So the goal is to build a system that can efficiently and securely forward quest
 - **Cannot** read the message contents, these are encrypted by the DMR agents.
 - There can be several instances of DMR server running, depending on load.
 - In the future, can potentially be extended to perform operations — like applying policies — on incoming and outgoing messages.
-- Includes support for Prometheus-based monitoring to help track the real-time health and behavior of the DMR server, specifically around WebSocket activity and message processing.
+- Includes support for Prometheus-based monitoring.
 
 ### RabbitMQ
 
 - Has per-Agent message queues.
-- Has a dead letter queue for messages that failed to deliver.
-- Has RabbitMQ UI-based monitoring tools set up.
+- Has per-Agent dead letter queues (DLQs) for messages that failed to deliver.
+- Has a single validation failures queue for messages that failed to validate.
 - Supports RabbitMQ clustering for scalability.
-- <https://www.rabbitmq.com/kubernetes/operator/operator-monitoring>
+- Includes support for Prometheus-based monitoring.
+- See [RabbitMQ details](#rabbitmq-details) below for more information.
 
 ## Local development
 
@@ -77,7 +81,8 @@ nvm install
 corepack enable pnpm
 corepack up
 pnpm install
-cp .env.example .env
+cp apps/dmr-server/.env.example apps/dmr-server/.env
+cp apps/dmr-agent/.env.example apps/dmr-agent/.env
 ```
 
 ### Running
@@ -92,17 +97,9 @@ pnpm start:agent
 
 - `pnpm test:server:log`: Run tests for DMR server
 - `pnpm test:agent:log`: Run tests for DMR agent
-- `pnpm e2e:full`: Run complete end-to-end test cycle (build, test, cleanup)
-
-For detailed information about e2e tests, including:
-
-- Service configurations and ports
-- Environment variables
-- Test scenarios and timeouts
-- Troubleshooting guide
-- Health check endpoints
-
-Please refer to the dedicated [e2e test README](./apps/tests/e2e/README.md).
+- `pnpm integration:server:log`: Run integration tests for DMR server
+- `pnpm integration:agent:log`: Run integration tests for DMR agent
+- `pnpm e2e:full`: Run complete end-to-end test cycle (build, test, cleanup). For detailed information about e2e tests, see [e2e test README](./apps/tests/e2e/README.md).
 
 ### Code Quality
 
@@ -130,11 +127,9 @@ docker compose up -d
 
 You can test the whole flow of the solution this way:
 
-1. Install [ngrok](https://ngrok.com) and run it with `ngrok http http://localhost:8080`.
-2. Copy the URL provided by ngrok and set it as `OUTGOING_MESSAGE_ENDPOINT` for `dmr-agent-a` in `docker-compose.yml`.
-3. Run a simple server to read messages sent to the ngrok tunnel: `python3 -m http.server 8080`.
-4. Run `docker compose up -d`.
-5. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
+1. Run `docker compose up -d`.
+2. Run `node scripts/test-server.js`. This starts a simple server to read messages coming to `OUTGOING_MESSAGE_ENDPOINT`. It emulates an external service in Agent A cluster.
+3. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
 
 ```bash
 curl -X POST http://localhost:8074/v1/messages \
@@ -162,7 +157,7 @@ curl -X POST http://localhost:8074/v1/messages \
   }'
 ```
 
-`dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You should see the message sent to the ngrok tunnel.
+`dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You will see the message sent to the test server.
 
 ## Environment Variables
 
@@ -328,27 +323,20 @@ List of metrics:
 
 - **`dmr_socket_connections_active`** | `gauge`
   Current number of active Socket.IO connections
-
 - **`dmr_socket_connections_total`** | `counter`
   Total number of established connections
-
 - **`dmr_socket_disconnections_total`** | `counter`
   Total number of disconnections
-
 - **`dmr_socket_connection_duration_seconds`** | `histogram`
   Duration of a socket connection session
-
 - **`dmr_socket_errors_total`** | `counter`
   Total number of connection errors
-
 - **`dmr_socket_events_received_total`** | `counter`
   Total events received from clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_socket_events_sent_total`** | `counter`
   Total events sent to clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_message_processing_duration_seconds`** | `histogram`
   Time to process/forward a single message
 
@@ -359,7 +347,6 @@ groups:
   - name: dmr-server-alerts
     rules:
       # Too many disconnected clients suddenly (spike detection)
-
       - alert: DMRHighDisconnectionRate
         expr: increase(dmr_socket_disconnections_total[5m]) > 100
         for: 2m
@@ -369,7 +356,6 @@ groups:
         summary: 'High rate of disconnections in DMR Server'
 
       # Low number of active connections (possible outage)
-
       - alert: DMRServerSocketsDown
         expr: dmr_socket_connections_active< 1
         for: 1m
@@ -379,7 +365,6 @@ groups:
         summary: 'No active socket connections detected on DMR Server'
 
       # Slow message routing
-
       - alert: DMRServerMessageRoutingLatencyHigh
         expr: histogram_quantile(0.95, rate(dmr_message_processing_duration_seconds[5m])) > 0.5
         for: 2m
@@ -397,33 +382,24 @@ List of metrics:
 
 - **`dmr_http_requests_total`** | `counter` | `method, route`
   Total HTTP requests handled
-
 - **`dmr_http_request_duration_seconds`** | `histogram` | `method, route, status`
   HTTP request processing time
-
 - **`dmr_http_errors_total` | `counter`** | `method, route, status`
   Count of error responses (4xx/5xx)
-
 - **`dmr_http_success_total` | `counter`** | `method, route, status`
   Count of success responses (2xx)
-
 - **`dmr_agent_socket_connection_active`** | `gauge`
   Current number of active Socket.IO connections
-
 - **`dmr_socket_connection_duration_seconds`** | `histogram`
   Duration of a socket connection session
-
 - **`dmr_socket_errors_total`** | `counter`
   Total number of connection errors
-
 - **`dmr_socket_events_received_total`** | `counter`
   Total events received from clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_socket_events_sent_total`** | `counter`
   Total events sent to clients
   _(labels: `event`, `namespace`)_
-
 - **`dmr_message_processing_duration_seconds`** | `histogram`
   Time to process/forward a single message
 
@@ -488,43 +464,30 @@ Suggested metrics:
 
 - **`rabbitmq_queue_messages_ready`** | `gauge`
   number of messages ready for delivery
-
 - **`rabbitmq_queue_messages_unacknowledged`** | `gauge`
   number of messages delivered to consumers but not yet acknowledged
-
 - **`rabbitmq_queue_messages_total`** | `counter`
   total number of messages published to the queue (ready + unacknowledged)
-
 - **`rabbitmq_connections`** | `gauge`
   current number of open connections
-
 - **`rabbitmq_channels`** | `gauge`
   current number of open AMQP channels
-
 - **`rabbitmq_queue_memory_usage`** | `gauge`
   memory used by individual queues
-
 - **`rabbitmq_node_memory_used_bytes`** | `gauge`
   total memory used by the RabbitMQ node
-
 - **`rabbitmq_node_disk_free`** | `gauge`
   disk space remaining on the node
-
 - **`rabbitmq_node_running`** | `gauge`
   node running status (1 = up, 0 = down)
-
 - **`rabbitmq_erlang_processes`** | `gauge`
   number of Erlang processes currently in use
-
 - **`rabbitmq_vm_memory_limit`** | `gauge`
   memory limit of the Erlang VM
-
 - **`rabbitmq_message_stats_publish`** | `counter`
   total number of messages published
-
 - **`rabbitmq_message_stats_ack`** | `counter`
   total number of messages acknowledged
-
 - **`rabbitmq_message_stats_delivery_get`** | `counter`
   total number of messages delivered or fetched from queues
 
@@ -576,3 +539,16 @@ Suggested alert rules:
     summary: "RabbitMQ node low disk space"
     description: "Less than 10 GB disk free. Could lead to message persistence issues."
 ```
+
+## Continuous Integration
+
+We use GitHub Actions for our CI pipeline. The following checks run automatically on all non-draft Pull Requests:
+
+- Format check
+- Linting
+- Unit tests (DMR Server)
+- Unit tests (DMR Agent)
+- Integration tests
+- Docker builds (Server & Agent)
+
+End-to-end (E2E) tests are also available but must be explicitly triggered by adding the `e2e` label to the PR. This is because E2E tests take approximately 5 minutes to complete and are only needed for certain changes.
