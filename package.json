@@ -107,7 +107,7 @@
     "supertest": "^7.1.1",
     "tslib": "^2.3.0",
     "typescript": "~5.7.2",
-    "typescript-eslint": "^8.19.0",
+    "typescript-eslint": "^8.36.0",
     "unplugin-swc": "^1.5.4",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.3",
