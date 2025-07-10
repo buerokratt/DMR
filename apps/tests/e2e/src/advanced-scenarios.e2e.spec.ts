@@ -1,5 +1,5 @@
 import { MessageType } from '@dmr/shared';
-import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { waitForHealthyServices } from './helpers/health-check.helper';
 
@@ -68,7 +68,7 @@ describe('DMR Basic Message Flow E2E Test', () => {
   };
 
   it('should deliver a message from Agent A to Agent B', async () => {
-    const messageId = uuidv4();
+    const messageId = crypto.randomUUID();
     const message: TestMessage = {
       id: messageId,
       type: MessageType.ChatMessage,

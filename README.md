@@ -81,7 +81,8 @@ nvm install
 corepack enable pnpm
 corepack up
 pnpm install
-cp .env.example .env
+cp apps/dmr-server/.env.example apps/dmr-server/.env
+cp apps/dmr-agent/.env.example apps/dmr-agent/.env
 ```
 
 ### Running
@@ -126,11 +127,9 @@ docker compose up -d
 
 You can test the whole flow of the solution this way:
 
-1. Install [ngrok](https://ngrok.com) and run it with `ngrok http http://localhost:8080`.
-2. Copy the URL provided by ngrok and set it as `OUTGOING_MESSAGE_ENDPOINT` for `dmr-agent-a` in `docker-compose.yml`.
-3. Run a simple server to read messages sent to the ngrok tunnel: `node scripts/test-server.js`.
-4. Run `docker compose up -d`.
-5. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
+1. Run `docker compose up -d`.
+2. Run `node scripts/test-server.js`. This starts a simple server to read messages coming to `OUTGOING_MESSAGE_ENDPOINT`. It emulates an external service in Agent A cluster.
+3. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
 
 ```bash
 curl -X POST http://localhost:8074/v1/messages \
@@ -158,7 +157,7 @@ curl -X POST http://localhost:8074/v1/messages \
   }'
 ```
 
-`dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You will see the message sent to the ngrok tunnel.
+`dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You will see the message sent to the test server.
 
 ## Environment Variables
 
