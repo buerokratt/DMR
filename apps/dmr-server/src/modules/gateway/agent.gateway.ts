@@ -9,6 +9,7 @@ import {
   ValidationErrorDto,
   ValidationErrorType,
 } from '@dmr/shared';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
   forwardRef,
@@ -28,6 +29,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { appConfig, AppConfig } from '../../common/config/app.config';
 import { MetricService } from '../../libs/metrics';
 import { RabbitMQService } from '../../libs/rabbitmq';
 import { RabbitMQMessageService } from '../../libs/rabbitmq/rabbitmq-message.service';
@@ -51,17 +53,71 @@ export class AgentGateway
 
   private readonly logger = new Logger(AgentGateway.name);
   private handleConnectionEvent: (socket: Socket) => void = () => null;
+  private readonly CONNECTED_AGENTS_CACHE_KEY = 'DMR_CONNECTED_AGENTS';
+  private readonly ACK_TIMEOUT: number;
 
   constructor(
+    @Inject(appConfig.KEY)
+    private readonly appConfig: AppConfig,
     @Inject(forwardRef(() => RabbitMQService))
     private readonly rabbitService: RabbitMQService,
     @Inject(forwardRef(() => RabbitMQMessageService))
     private readonly rabbitMQMessageService: RabbitMQMessageService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly messageValidator: MessageValidatorService,
     private readonly centOpsService: CentOpsService,
     private readonly metricService: MetricService,
     private readonly authService: AuthService,
-  ) {}
+  ) {
+    this.ACK_TIMEOUT = this.appConfig.messageDeliveryTimeoutMs;
+  }
+
+  private async getConnectedAgentsMap(): Promise<Map<string, string>> {
+    const agentsMap = await this.cacheManager.get<Map<string, string> | Record<string, string>>(
+      this.CONNECTED_AGENTS_CACHE_KEY,
+    );
+
+    if (!agentsMap) {
+      return new Map<string, string>();
+    }
+
+    // Handle case where cache returns plain object instead of Map
+    if (agentsMap instanceof Map) {
+      return agentsMap;
+    }
+
+    // Convert plain object to Map
+    return new Map(Object.entries(agentsMap));
+  }
+
+  private async setConnectedAgent(agentId: string, socketId: string): Promise<void> {
+    const agentsMap = await this.getConnectedAgentsMap();
+    agentsMap.set(agentId, socketId);
+    await this.cacheManager.set(this.CONNECTED_AGENTS_CACHE_KEY, agentsMap);
+  }
+
+  private async removeConnectedAgent(agentId: string): Promise<void> {
+    const agentsMap = await this.getConnectedAgentsMap();
+    agentsMap.delete(agentId);
+    await this.cacheManager.set(this.CONNECTED_AGENTS_CACHE_KEY, agentsMap);
+  }
+
+  private async waitForServerReady(): Promise<void> {
+    if (this.server?.sockets) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      const checkServer = () => {
+        if (this.server?.sockets) {
+          resolve();
+        } else {
+          setTimeout(checkServer, 50);
+        }
+      };
+      checkServer();
+    });
+  }
 
   onModuleInit() {
     this.handleConnectionEvent = (socket: Socket) => {
@@ -89,10 +145,10 @@ export class AgentGateway
     const originalServerEmit = this.server.emit.bind(this.server);
 
     const serverEmit: Server['emit'] = (event: string, ...arguments_: unknown[]) => {
-      const sockets = this.server.sockets?.sockets;
+      const namespace = this.server?.sockets;
 
-      if (sockets) {
-        for (const socket of [...sockets.values()]) {
+      if (namespace?.sockets) {
+        for (const socket of [...namespace.sockets.values()]) {
           this.metricService.eventsSentTotalCounter.inc({ event, namespace: socket.nsp.name });
         }
       }
@@ -114,20 +170,16 @@ export class AgentGateway
 
       const connectionData = await this.authService.verifyToken(token);
 
+      this.logger.debug(
+        `Agent ${connectionData.jwtPayload.sub} authenticated successfully, setting jwtPayload on socket ${client.id}`,
+      );
+
       Object.assign(client, {
         jwtPayload: connectionData.jwtPayload,
         authenticationCertificate: connectionData.authenticationCertificate,
       });
 
-      const existingSocket = this.findSocketByAgentId(connectionData.jwtPayload.sub);
-      if (existingSocket && existingSocket.id !== client.id) {
-        this.logger.log(
-          `Dropping existing connection for agent ${connectionData.jwtPayload.sub} (Socket ID: ${existingSocket.id}) in favor of new connection (Socket ID: ${client.id})`,
-        );
-        existingSocket.disconnect();
-
-        await this.rabbitService.unsubscribe(connectionData.jwtPayload.sub);
-      }
+      this.logger.debug(`Socket ${client.id} jwtPayload set: sub=${client.jwtPayload?.sub}`);
 
       const queueSetup = await this.rabbitService.setupQueue(connectionData.jwtPayload.sub);
       if (!queueSetup) {
@@ -150,11 +202,31 @@ export class AgentGateway
         return;
       }
 
+      // Check for existing connections using our registry
+      const agentsMap = await this.getConnectedAgentsMap();
+      const existingSocketId = agentsMap.get(connectionData.jwtPayload.sub);
+      if (existingSocketId && existingSocketId !== client.id) {
+        this.logger.log(
+          `Dropping existing connection for agent ${connectionData.jwtPayload.sub} (Socket ID: ${existingSocketId}) in favor of new connection (Socket ID: ${client.id})`,
+        );
+        // Disconnect the existing socket using Socket.IO room functionality
+        this.server.to(existingSocketId).disconnectSockets(true);
+        await this.rabbitService.unsubscribe(connectionData.jwtPayload.sub);
+      }
+
+      // Add to our socket registry
+      await this.setConnectedAgent(connectionData.jwtPayload.sub, client.id);
+      this.logger.debug(`Agent ${connectionData.jwtPayload.sub} added to socket registry`);
+
       const centOpsConfigurations = await this.centOpsService.getCentOpsConfigurations();
       this.server.emit(AgentEventNames.FULL_AGENT_LIST, centOpsConfigurations);
 
       this.metricService.activeConnectionGauge.inc(1);
       this.metricService.connectionsTotalCounter.inc(1);
+
+      this.logger.log(
+        `Agent ${connectionData.jwtPayload.sub} connected successfully (Socket ID: ${client.id})`,
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -174,6 +246,8 @@ export class AgentGateway
 
     if (agentId) {
       await this.rabbitService.unsubscribe(agentId);
+      await this.removeConnectedAgent(agentId);
+      this.logger.debug(`Agent ${agentId} removed from socket registry`);
     }
 
     if (connectedAt) {
@@ -199,9 +273,10 @@ export class AgentGateway
   }
 
   private async validateActiveConnections(data: CentOpsConfigurationDifference): Promise<void> {
-    const connectedSockets = this.server?.sockets?.sockets;
+    // Use our socket registry instead of trying to access Socket.IO's internal collection
+    const agentsMap = await this.getConnectedAgentsMap();
 
-    if (!connectedSockets || connectedSockets.size === 0) {
+    if (agentsMap.size === 0) {
       return;
     }
 
@@ -211,9 +286,10 @@ export class AgentGateway
     const deletedAgentIds = new Set(data.deleted.map((agent) => agent.id));
     const certificateChangedAgentIds = new Set(data.certificateChanged.map((agent) => agent.id));
 
-    for (const [, socket] of connectedSockets.entries()) {
-      await this.validateAndDisconnectSocket(
-        socket,
+    // Validate each connected agent
+    for (const [agentId] of agentsMap.entries()) {
+      await this.validateAndDisconnectAgentById(
+        agentId,
         deletedAgentIds,
         certificateChangedAgentIds,
         currentAgentMap,
@@ -221,19 +297,12 @@ export class AgentGateway
     }
   }
 
-  private async validateAndDisconnectSocket(
-    socket: Socket,
+  private async validateAndDisconnectAgentById(
+    agentId: string,
     deletedAgentIds: Set<string>,
     certificateChangedAgentIds: Set<string>,
     currentAgentMap: Map<string, ClientConfigDto>,
   ): Promise<void> {
-    const agentId = socket.jwtPayload?.sub;
-    const connectionCertificate = socket.authenticationCertificate;
-
-    if (!agentId || !connectionCertificate) {
-      return;
-    }
-
     let shouldDisconnect = false;
     let reason = '';
 
@@ -245,9 +314,6 @@ export class AgentGateway
       reason = 'Agent certificate has been rotated/revoked';
     } else {
       // Defensive safety check: Verify agent exists in the fresh configuration from CentOps.
-      // This catches edge cases where an agent might not be in the deleted/certificateChanged arrays
-      // but is also not present in the current authorized configuration (due to data processing bugs
-      // or inconsistencies in the configuration update event).
       const currentAgentConfig = currentAgentMap.get(agentId);
       if (!currentAgentConfig) {
         shouldDisconnect = true;
@@ -256,9 +322,7 @@ export class AgentGateway
     }
 
     if (shouldDisconnect) {
-      this.logger.warn(
-        `Dropping connection for agent ${agentId} (Socket ID: ${socket.id}): ${reason}`,
-      );
+      this.logger.warn(`Dropping connection for agent ${agentId}: ${reason}`);
 
       try {
         await this.rabbitService.unsubscribe(agentId);
@@ -268,7 +332,45 @@ export class AgentGateway
         );
       }
 
+      // Disconnect the agent by finding and disconnecting their socket
+      await this.disconnectAgentById(agentId);
+    }
+  }
+
+  private async findSocketByAgentId(agentId: string): Promise<Socket | null> {
+    const agentsMap = await this.getConnectedAgentsMap();
+    const socketId = agentsMap.get(agentId);
+    if (!socketId) return null;
+
+    await this.waitForServerReady();
+
+    let socket: Socket | undefined;
+
+    //  iterating through sockets map
+    const serverWithSockets = this.server as unknown as { sockets?: Map<string, Socket> };
+    if (serverWithSockets.sockets) {
+      socket = serverWithSockets.sockets.get(socketId);
+      if (socket) {
+        this.logger.debug(`Found socket through sockets map`, socket);
+      }
+    }
+
+    if (socket?.connected) {
+      return socket;
+    }
+
+    // Socket no longer exists or is disconnected, clean up cache
+    await this.removeConnectedAgent(agentId);
+    return null;
+  }
+
+  private async disconnectAgentById(agentId: string): Promise<void> {
+    const socket = await this.findSocketByAgentId(agentId);
+
+    if (socket) {
       socket.disconnect(true);
+      await this.removeConnectedAgent(agentId);
+      this.logger.debug(`Agent ${agentId} (Socket ID: ${socket.id}) disconnected`);
     }
   }
 
@@ -277,17 +379,16 @@ export class AgentGateway
     message: AgentMessageDto,
   ): Promise<ISocketAckPayload | null> {
     try {
-      const socket = this.findSocketByAgentId(agentId);
+      const socket = await this.findSocketByAgentId(agentId);
 
       if (!socket) {
         this.logger.warn(`No connected socket found for agent ${agentId}`);
         return null;
       }
 
-      const response = (await socket.emitWithAck(
-        AgentEventNames.MESSAGE_FROM_DMR_SERVER,
-        message,
-      )) as ISocketAckPayload;
+      const response = (await socket
+        .timeout(this.ACK_TIMEOUT)
+        .emitWithAck(AgentEventNames.MESSAGE_FROM_DMR_SERVER, message)) as ISocketAckPayload;
 
       if (response.status === SocketAckStatus.ERROR) {
         const errorTypes = response.errors?.map((error) => error.type) ?? [];
@@ -309,19 +410,6 @@ export class AgentGateway
 
       return null;
     }
-  }
-
-  private findSocketByAgentId(agentId: string): Socket | null {
-    const connectedSockets = this.server?.sockets?.sockets;
-    if (!connectedSockets) {
-      return null;
-    }
-    for (const [, socket] of connectedSockets.entries()) {
-      if (socket.jwtPayload?.sub === agentId) {
-        return socket;
-      }
-    }
-    return null;
   }
 
   @SubscribeMessage(AgentEventNames.MESSAGE_TO_DMR_SERVER)

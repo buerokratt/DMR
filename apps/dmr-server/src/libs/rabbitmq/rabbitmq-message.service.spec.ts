@@ -1,10 +1,10 @@
+import { MessageType, ValidationErrorType } from '@dmr/shared';
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Logger } from '@nestjs/common';
+import { rabbitMQConfig } from '../../common/config';
 import { RabbitMQMessageService } from './rabbitmq-message.service';
 import { RabbitMQService } from './rabbitmq.service';
-import { RABBITMQ_CONFIG_TOKEN, rabbitMQConfig } from '../../common/config';
-import { MessageType, ValidationErrorType } from '@dmr/shared';
 
 describe('RabbitMQMessageService', () => {
   let service: RabbitMQMessageService;
@@ -117,14 +117,19 @@ describe('RabbitMQMessageService', () => {
   });
 
   describe('onModuleInit', () => {
-    it('should call setupValidationFailuresQueue', async () => {
+    it('should call setupValidationFailuresQueueWithRetry', async () => {
       const setupSpy = vi
-        .spyOn(service as any, 'setupValidationFailuresQueue')
+        .spyOn(service as any, 'setupValidationFailuresQueueWithRetry')
         .mockResolvedValueOnce(undefined);
 
+      vi.useFakeTimers();
+
       await service.onModuleInit();
+      await vi.runAllTimersAsync();
 
       expect(setupSpy).toHaveBeenCalled();
+
+      vi.useRealTimers();
     });
   });
 

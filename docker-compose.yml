@@ -31,12 +31,12 @@ services:
     container_name: dmr-server
     restart: always
     ports:
-      - '8072:5000'
+      - '8072:8075'
     depends_on:
       rabbitmq:
         condition: service_healthy
     environment:
-      - PORT=5000
+      - PORT=8075
       - ENVIRONMENT=development # Set to "production" when deployed
       - LOGGER_COLORS=true # Set to "false" when deployed
       - LOGGER_LOG_LEVELS=error,warn,log
@@ -64,7 +64,7 @@ services:
     networks:
       - bykstack
     healthcheck:
-      test: ['CMD', 'wget', '-O', '/dev/null', '-q', 'http://localhost:5000/v1/health']
+      test: ['CMD', 'wget', '-O', '/dev/null', '-q', 'http://localhost:8075/v1/health']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -77,21 +77,21 @@ services:
     container_name: dmr-agent-a
     restart: always
     ports:
-      - '8073:5001' # Agent 1 port
+      - '8073:8077' # Agent 1 port
     depends_on:
       dmr-server:
         condition: service_healthy
     environment:
-      - PORT=5001
+      - PORT=8077
       - ENVIRONMENT=development # Set to "production" when deployed
       - LOGGER_COLORS=true # Set to "false" when deployed
       - LOGGER_LOG_LEVELS=error,warn,log
-      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:5000
+      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:8075
       - WEBSOCKET_RECONNECTION_DELAY=1000
       - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
       - AGENT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDCIp6i9mlfmCRT\nxCs2juw85fXX+323t5LvakEqcjsu5NMnzfPrsEmfmUfQhl+8p0+t7rq8RRJ5ocQO\nIxKHg+MDyTMfHKeG6GjjcKOPh4VZ7s/NQscURjE0gMYKEK+h9QAeF8T+5EQFWBTr\nq7N6QqzcarXX1e4zAYZqrTYZepkyeQqkmbl6yN3sA6AbAWczRwiBLGZwBn9YHLvv\nXPgDXO/ndkkQg+GtfdI8Kp4eK/HhG4bHVFIJxLBBWqYD2Xxy3ETIGsVj0priE7xl\n3D/rTxgxfRN8gJn8SBdU8Aq4wqu0gtn2+V9HUgklYC+QS8ja+FbxjVwx4bW35Pdh\nfqMl/7FDAgMBAAECggEAAN1un4NBjO98mfLxzlhsrQjJQ6EXOk5TFUX/7FR99wOF\n/VNpls8+RLvGGiO/IXQNYtUBd/1Gy8vwt69oUbpAtK+czrKt/Gfkr768u9L6wR/T\nRTLa+Dgn1/gK6diRL8OLsJaihhA2TV/LGBG3xv+tDX5cOQ329bs4AhmreAmXzSXC\n6pnV/e18hKjyBDPyhoH54AOv0sL9HZ5NldSNTuBt+DXynFuEvRx27X2AXDWc6yn/\nGVSDlITrs0L5jQgen9/pk06wrVO8h6NNfOGj7dChARQDRLscLyrr7ossUGSXfrFd\nNL0E/KbSYVPnfHwAQbjU5SmrxcmthNbGbywx+1/tQQKBgQD5cYu2xAwmBZ8dlYZR\nHVNStj0zVTZIt9v1qJw81I5Cff/YYKhy5niJZnsRHR6D3YNfEzBbeUtXxtmixiga\n9lJPEJgKJGkGCVu9ASus7JRDqoF/ZvICtYblrmmvEL0A8JHyBtj5yxMHLy7MOTK0\ntipu6MzR6L3wFjjB1GByYmktqwKBgQDHPOpsIGZo3hiFBYM3AHiig22WqCD6ei/w\nPd2Kln1HJuexS8xxu3H2dp/mrqo/vmiVAaFpYnIjt0gw0wXYuXAj/WoydyjUhLOA\n/D+lAb9fTftGSBMMgyeunMn9WhPK9EiqenMMWVhnh3pRdxvvkI/+1WgMg3wNEaJT\nZ75+Sq6CyQKBgQDoZ0YIrnezJSGuapWOFYiAU5KJtSaycbraEpIeittQUByC+Ot4\nwgoj2ftnYn3/1e6EMlinoUb1LSuwYHcVR9JAH/HH4UyId0elvOV4Y6Nvt/iXPs7U\nf1SDwhBtL2co7PrNSFv3v6Cm3Or5E4GOpPq8AuJx4Cq2+b0/uiNx7waXqQKBgFIE\ntrBKaj4zZ76i9VBYJlEob528ms7iLAfnP+NEblAzKOAoxwHu20xNqyfIsZdKKD1n\nDW6Xs0sWsWZACMEeHZcDRIt/2FQcSNUJgp3H6WMvdAiLtSPKfjR4oQJl6Y38IEnl\n3KSxxx3ffLA6q0pkpZKPgaTdH901bDCPnbDZx5tZAoGAaZxnKL6jXwM81O53b4Yy\nVKSp/6rmDKyM8ktYFXDNym4RHxgXZpTh8x0qm25VSp4VPMedkcdw3kyXhRMEx67h\nXyDZrRsHlsb0MhLIYZO2qqg3h8fMOy9Qq4XFiYwULbXsDqb+rVEkgVN7n0eYmzyw\nTdbApdajV+mDlvsWb99RuOg=\n-----END PRIVATE KEY-----
       - AGENT_ID=d3b07384-d9a0-4c3f-a4e2-123456789abc
-      - OUTGOING_MESSAGE_ENDPOINT=http://localhost:3001/api/messages
+      - OUTGOING_MESSAGE_ENDPOINT=http://host.docker.internal:8080
       - MESSAGE_DELIVERY_TIMEOUT_MS=2000
     networks:
       - bykstack
@@ -103,21 +103,21 @@ services:
     container_name: dmr-agent-b
     restart: always
     ports:
-      - '8074:5001' # Agent 2 port
+      - '8074:8077' # Agent 2 port
     depends_on:
       dmr-server:
         condition: service_healthy
     environment:
-      - PORT=5001
+      - PORT=8077
       - ENVIRONMENT=development # Set to "production" when deployed
       - LOGGER_COLORS=true # Set to "false" when deployed
       - LOGGER_LOG_LEVELS=error,warn,log
-      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:5000
+      - DMR_SERVER_WEBSOCKET_URL=http://dmr-server:8075
       - WEBSOCKET_RECONNECTION_DELAY=1000
       - WEBSOCKET_RECONNECTION_DELAY_MAX=5000
       - AGENT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC3gO/RQM8nGV05\npHqRvtIPTxl01B433biixYS/55Fvqb4JrrQrLX3YgDvKgZK0g5SRuCN5LS5FWmmg\nRAUQZnYuMhh3Y/bVFnSM2VvSMFHNCrWh1qONvKAP1JBw45z9dUPE0pAwvyqJRJqg\njY8RWgALADZQRAvulpPAbjO8BrqgCpihrha681mmTFqa9nH9mfhwOu5EWkiuWRUW\nPXOnkYDz1RFNvUYW87XaC2k96uNCSMCJemgm/He5xiz6c9fN/pRZuz+bM5V+5z9V\nZyobq9G432bYC2BBm7sMORvl8ErwPGWDdaQ9DDs/dN+eibE+BGVbuXne3OYrTSRy\nM8QPYrIrAgMBAAECggEASThTeKVpgupl/mgY2CrR2nXvbGRvIk+AKsKxc3lM2Mdc\nIrTpAwmF22tfcDA/f3O5RmO5E9LpUZb/6oj5lE+t/ETU6l6i0OfC3ailMLtDCJOr\nYcYpQJbxLx/b+o93xtKRlemGy0ycBmWvZTzWx0+oELum8GQWdr7yeaf/UJlGwjCJ\n+Q95Ymf51EdhirW1gKmSMtGEMG9kGNK8u8e2kAqv3rM/QPtD6xYXLesB+Dfr/kew\ndL51pSjl+IMWwXIKScgTzg/nnNwTEap9ymiLJ6k7EkR/UxlvYGDx0H8C5JnUeoiu\nGeCdIs/vkjs2yLRki6AVQBEjc3sfBHvAXT5UDrgpYQKBgQD0fxiiYQsqNxTcKUaO\nF6HuH/DeJUVzNK7emviDD/8hffxe+gNAUvOmUb4E31OS6BYC23zkaYhlly16j9KC\nhSqK4OKkw+Xdd/fV7l9fi0th7X4aRBL8Jrx1zaLrFrf2DhvBxWjNjVSEklg9zSEt\nit+VXzJpSbZ0NLe7j4rONNi2kwKBgQDAIzI41MYOYcsGrSMm2yaNacPMKXZpgzsk\nvNEL2VOaNFKyKw4lbAe2rmbirvciFZhjxFxLX/TpVmmipmDrcLU0HVDEOWs0wAXp\n6ZoSpzPT6JjAeN1x+A6SgpPi4y8UXaRsCJ7zCvxu75N4BFKXybtyiGEL4KR9/SKb\nkQvm03f9CQKBgQDQ/te67gNSObVeIPZLvg3QdIM8EVYVjaIxbP0jY4guQ/h343Tm\nBkJ6GIO6vIA/Ip62IJLY2REb7ieVDd3fbh+YiXWTbFVQhB1ZRKNIE9UDR7S0lR45\nZo9Qj9BE7q2f6h11/N6CXt4xWLuPUIqc2IoYsEByWe1Z1jp8XM5FSE07ewKBgQCP\nfDlPM6bMqr9htv6fT93UkX2FBBnH5hbO8qryvFOwvw5au8iOrcR86nUvKBaqv5HU\nP5nlOD2/26Z7ruCGMt8/kfz07SRgel5wNuG2uGL+B5+7bQeCywqm4xjpwVsxTFUz\n0KRTQIsPlZ59bEz5yc9QUwSWSCbPZ7DmmEVZFedvcQKBgQDPRSSNFGtQuXKu1Dwl\nVXHZlv7XY2eDK0teOZsjSjM7COMWhQf/BpKPxlgiLYzyExnUn7ESIMjkmx7HrYhL\negUA0ZXlk8c/v8DhLWy220wmb6p22NbsVfJiYRZkEjhgpn5gtOE/brL7ikEEDy7n\n9q3py9qYZN0fTIpoA/AFIXHyOA==\n-----END PRIVATE KEY-----
       - AGENT_ID=a1e45678-12bc-4ef0-9876-def123456789
-      - OUTGOING_MESSAGE_ENDPOINT=http://localhost:3002/api/messages
+      - OUTGOING_MESSAGE_ENDPOINT=http://host.docker.internal:8080
       - MESSAGE_DELIVERY_TIMEOUT_MS=2000
     networks:
       - bykstack

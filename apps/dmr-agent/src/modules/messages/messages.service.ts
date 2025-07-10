@@ -5,6 +5,7 @@ import {
   AgentEventNames,
   ChatMessagePayloadDto,
   ClientConfigDto,
+  DMRServerMessageDto,
   ExternalServiceMessageDto,
   IAgent,
   ISocketAckCallback,
@@ -29,6 +30,7 @@ import {
 } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { AgentConfig, agentConfig } from '../../common/config';
+import { webSocketConfig, WebSocketConfig } from '../../common/config/web-socket.config';
 import { MetricService } from '../../libs/metrics';
 import { WebsocketService } from '../websocket/websocket.service';
 
@@ -39,6 +41,7 @@ export class MessagesService implements OnModuleInit {
 
   constructor(
     @Inject(agentConfig.KEY) private readonly agentConfig: AgentConfig,
+    @Inject(webSocketConfig.KEY) private readonly webSocketConfig: WebSocketConfig,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly websocketService: WebsocketService,
     private readonly metricService: MetricService,
@@ -179,8 +182,9 @@ export class MessagesService implements OnModuleInit {
         });
       }
 
-      const outgoingMessage: ExternalServiceMessageDto = {
+      const outgoingMessage: DMRServerMessageDto = {
         id: message.id,
+        senderId: message.senderId,
         recipientId: message.recipientId,
         timestamp: message.timestamp,
         type: message.type,
@@ -224,7 +228,9 @@ export class MessagesService implements OnModuleInit {
     }
   }
 
-  private async handleOutgoingMessage(message: ExternalServiceMessageDto): Promise<boolean> {
+  private async handleOutgoingMessage(
+    message: ExternalServiceMessageDto | DMRServerMessageDto,
+  ): Promise<boolean> {
     if (!this.agentConfig.outgoingMessageEndpoint) {
       throw new Error('Outgoing message endpoint not configured');
     }
@@ -254,6 +260,10 @@ export class MessagesService implements OnModuleInit {
   }
 
   async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
+    this.logger.debug(
+      ` Starting sendEncryptedMessageToServer with message: ${JSON.stringify(message, null, 2)}`,
+    );
+
     const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
 
     if (!encryptedMessage) {
@@ -262,6 +272,7 @@ export class MessagesService implements OnModuleInit {
     }
 
     this.logger.log(`Message encrypted successfully`);
+    this.logger.debug(` Encrypted message: ${JSON.stringify(encryptedMessage, null, 2)}`);
 
     if (!this.websocketService.isConnected()) {
       this.logger.error('WebSocket service is not connected to DMR server.');
@@ -280,10 +291,12 @@ export class MessagesService implements OnModuleInit {
     }
 
     try {
-      const ack = (await socket.emitWithAck(
-        AgentEventNames.MESSAGE_TO_DMR_SERVER,
-        encryptedMessage,
-      )) as SocketAckResponse;
+      this.logger.debug(`Sending message to DMR server via WebSocket`);
+      const ack = (await socket
+        .timeout(this.webSocketConfig.ackTimeout)
+        .emitWithAck(AgentEventNames.MESSAGE_TO_DMR_SERVER, encryptedMessage)) as SocketAckResponse;
+
+      this.logger.debug(`Received ACK from DMR server: ${JSON.stringify(ack, null, 2)}`);
 
       if (ack.status === SocketAckStatus.ERROR) {
         this.logger.error(ack.error);
@@ -294,6 +307,9 @@ export class MessagesService implements OnModuleInit {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Unexpected error sending message to DMR Server';
+
+      this.logger.error(`Error in sendEncryptedMessageToServer: ${message}`);
+      this.logger.error(` Error details: ${JSON.stringify(error, null, 2)}`);
 
       if (error instanceof GatewayTimeoutException || error instanceof BadGatewayException) {
         throw error;
@@ -307,14 +323,17 @@ export class MessagesService implements OnModuleInit {
   async encryptMessagePayloadFromExternalService(
     message: ExternalServiceMessageDto,
   ): Promise<AgentEncryptedMessageDto | null> {
+    this.logger.debug(`Starting encryption for message: ${JSON.stringify(message, null, 2)}`);
+
     try {
-      const uuid = crypto.randomUUID();
       const recipient = await this.getAgentById(message.recipientId);
 
       if (!recipient) {
-        this.logger.error(`Recipient info not found.`);
+        this.logger.error(`Recipient info not found for ID: ${message.recipientId}`);
         return null;
       }
+
+      this.logger.debug(`Found recipient: ${JSON.stringify(recipient, null, 2)}`);
 
       const encryptedPayload = await Utils.encryptPayload(
         message.payload,
@@ -322,8 +341,10 @@ export class MessagesService implements OnModuleInit {
         recipient.authenticationCertificate,
       );
 
+      this.logger.debug(`Payload encrypted successfully`);
+
       const encryptedMessage: AgentEncryptedMessageDto = {
-        id: uuid,
+        id: message.id, // Preserve the original message ID
         type: message.type,
         payload: encryptedPayload,
         recipientId: recipient.id,
@@ -331,10 +352,13 @@ export class MessagesService implements OnModuleInit {
         timestamp: message.timestamp,
       };
 
+      this.logger.debug(`Created encrypted message: ${JSON.stringify(encryptedMessage, null, 2)}`);
+
       return encryptedMessage;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
       this.logger.error(`Error encrypting message: ${errorMessage}`);
+      this.logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack'}`);
       return null;
     }
   }
