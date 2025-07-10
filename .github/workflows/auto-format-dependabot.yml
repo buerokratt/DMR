@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal access token.
+          fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
           ref: ${{ github.head_ref }}
       - uses: ./.github/actions/setup
 
@@ -21,14 +23,14 @@ jobs:
 
       - name: Commit and push formatted code
         run: |
-          git config --global user.name "dependabot-autoformat"
-          git config --global user.email "action@github.com"
+          git config --local user.name "dependabot-autoformat"
+          git config --local user.email "action@github.com"
            
           git add .
 
           if ! git diff --quiet; then
-           git commit -am "chore: autoformat (via CI)"
-           git push
+           git commit -a -m "chore: autoformat (via CI)"
+           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.head_ref }}
           else
            echo "No changes to commit"
           fi
