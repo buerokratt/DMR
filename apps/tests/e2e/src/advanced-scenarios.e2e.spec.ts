@@ -217,9 +217,9 @@ describe('DMR Basic Message Flow E2E Test', () => {
                 {
                   content: message.payload,
                   timestamp: message.timestamp,
-                }
-              ]
-            }
+                },
+              ],
+            },
           }),
         });
         // Expected to possibly fail, but we'll check the validation failures queue
@@ -234,10 +234,10 @@ describe('DMR Basic Message Flow E2E Test', () => {
     // Test 3: Verify validation failures queue functionality
     const validationFailuresStats = await getQueueStats('validation-failures');
     const failureMessages = await getQueueMessages('validation-failures', 5);
-    
+
     // Verify queue access methods work correctly
     expect(Array.isArray(failureMessages)).toBe(true);
-    
+
     // Test 4: Verify agent queue is clean after processing
     const agentQueueStats = await getQueueStats('a1e45678-12bc-4ef0-9876-def123456789');
     expect(agentQueueStats).toBeDefined();
@@ -282,14 +282,14 @@ describe('DMR Basic Message Flow E2E Test', () => {
     for (const message of sequentialMessages) {
       const result = await sendMessage(message);
       expect(result.success).toBe(true);
-      
+
       // Wait for this specific message to be processed
       const receivedMessage = await waitForMessage(message.id);
       expect(receivedMessage).toBeDefined();
       expect(receivedMessage?.id).toBe(message.id);
       expect(receivedMessage?.type).toBe(MessageType.ChatMessage);
       expect(receivedMessage?.recipientId).toBe('a1e45678-12bc-4ef0-9876-def123456789');
-      
+
       // Small delay between messages to ensure proper processing
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
