@@ -38,12 +38,12 @@ counter=0
 
 while [ $counter -lt $timeout ]; do
     healthy_services=$(docker-compose -f "${DOCKER_COMPOSE_FILE}" ps | grep -c "healthy" || echo "0")
-    
+
     if [ "$healthy_services" -ge 5 ]; then
         echo -e "${GREEN}✅ All services are healthy!${NC}"
         break
     fi
-    
+
     echo "Waiting for services... ($counter/$timeout)"
     sleep 5
     counter=$((counter + 5))
@@ -65,6 +65,8 @@ cd ..
 
 # Set environment variables and run tests
 export RABBITMQ_MANAGEMENT_URL=http://localhost:8072
+export RABBITMQ_DEFAULT_USER=user
+export RABBITMQ_DEFAULT_PASSWORD=pass
 export DMR_SERVER_1_URL=http://localhost:8075
 export DMR_SERVER_2_URL=http://localhost:8076
 export DMR_AGENT_A_URL=http://localhost:8077
@@ -74,4 +76,4 @@ export EXTERNAL_SERVICE_B_URL=http://localhost:8074
 
 npx --yes pnpm@latest test
 
-echo -e "${GREEN}✅ E2E Tests completed successfully!${NC}" 
+echo -e "${GREEN}✅ E2E Tests completed successfully!${NC}"
