@@ -57,7 +57,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "compression": "^1.8.0",
-    "cron": "4.3.0",
+    "cron": "4.3.1",
     "express": "^5.1.0",
     "joi": "^17.13.3",
     "prom-client": "^15.1.3",
