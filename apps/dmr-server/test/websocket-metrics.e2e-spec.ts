@@ -7,6 +7,7 @@ import { AppModule } from '../src/app.module';
 import { RabbitMQService } from '../src/libs/rabbitmq';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { CentOpsService } from '../src/modules/centops/centops.service';
+import { AgentConnectionData } from '@dmr/shared';
 
 function createMockJwtWithKidAndSub(kid: string): string {
   const header = {
@@ -50,7 +51,21 @@ describe('WebSocket Metrics (e2e)', () => {
         }),
       })
       .overrideProvider(AuthService)
-      .useValue({ verifyToken: (token: string) => ({ sub: token, cat: Date.now() }) })
+      .useValue({
+        verifyToken: (token: string): AgentConnectionData => {
+          const [, payload] = token.split('.');
+          const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
+          return {
+            jwtPayload: {
+              sub: decodedPayload.sub,
+              cat: Date.now(),
+              iat: 123,
+              exp: 123,
+            },
+            authenticationCertificate: 'certificate',
+          };
+        },
+      })
       .overrideProvider(RabbitMQService)
       .useValue({
         setupQueue: () => true,
@@ -68,18 +83,21 @@ describe('WebSocket Metrics (e2e)', () => {
     const wsUrl = `http://localhost:${port}${namespace}`;
     metricsEndpoint = `http://localhost:${port}/metrics`;
 
-    const mockClientId = 'mock-id';
-    const mockAuthToken = createMockJwtWithKidAndSub(mockClientId);
+    const mockClientId1 = 'mock-id-1';
+    const mockAuthToken1 = createMockJwtWithKidAndSub(mockClientId1);
 
     client1 = io(wsUrl, {
       autoConnect: false,
-      auth: { token: mockAuthToken },
+      auth: { token: mockAuthToken1 },
       transports: ['websocket'],
     });
 
+    const mockClientId2 = 'mock-id-2';
+    const mockAuthToken2 = createMockJwtWithKidAndSub(mockClientId2);
+
     client2 = io(wsUrl, {
       autoConnect: false,
-      auth: { token: mockAuthToken },
+      auth: { token: mockAuthToken2 },
       transports: ['websocket'],
     });
 
