@@ -351,7 +351,7 @@ export class AgentGateway
     if (serverWithSockets.sockets) {
       socket = serverWithSockets.sockets.get(socketId);
       if (socket) {
-        this.logger.debug(`Found socket through sockets map`, socket);
+        this.logger.debug(`Found socket through sockets map: ${socket.id}`);
       }
     }
 
@@ -393,7 +393,7 @@ export class AgentGateway
       if (response.status === SocketAckStatus.ERROR) {
         const errorTypes = response.errors?.map((error) => error.type) ?? [];
 
-        if (errorTypes.includes(ValidationErrorType.DELIVERY_FAILED)) {
+        if (!errorTypes.includes(ValidationErrorType.DELIVERY_FAILED)) {
           await this.rabbitMQMessageService.sendValidationFailure(
             message,
             response.errors ?? [],
