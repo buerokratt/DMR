@@ -637,11 +637,7 @@ describe('AgentGateway', () => {
           ]),
         }),
       );
-      expect(mockRabbitMQMessageService.sendValidationFailure).toHaveBeenCalledWith(
-        testMessage,
-        errorResponse.errors,
-        testMessage.receivedAt,
-      );
+      expect(mockRabbitMQMessageService.sendValidationFailure).not.toHaveBeenCalledWith();
       expect(mockSocket1.timeout).toHaveBeenCalledWith(10000);
       expect(emitWithAckMock).toHaveBeenCalledWith(
         AgentEventNames.MESSAGE_FROM_DMR_SERVER,
@@ -699,7 +695,11 @@ describe('AgentGateway', () => {
         testMessage,
       );
 
-      expect(mockRabbitMQMessageService.sendValidationFailure).not.toHaveBeenCalled();
+      expect(mockRabbitMQMessageService.sendValidationFailure).toHaveBeenCalledWith(
+        testMessage,
+        errorResponse.errors,
+        testMessage.receivedAt,
+      );
       expect(mockSocket2.emit).not.toHaveBeenCalled();
 
       expect(response).toEqual(
