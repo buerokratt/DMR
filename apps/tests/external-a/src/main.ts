@@ -25,6 +25,7 @@ interface SimpleMessage {
   timestamp?: string;
   type: MessageType;
   payload: string | Record<string, unknown>;
+  receivedAt?: string;
 }
 
 // Store sent messages for verification
@@ -91,7 +92,7 @@ app.post('/api/messages', async (request: Request, response: Response): Promise<
 
 // Endpoint to receive messages from DMR Agent A (incoming messages)
 app.post('/api/messages/incoming', (request, response) => {
-  const message = request.body;
+  const message = request.body as unknown as SimpleMessage;
   console.log('[External A] Received incoming message from DMR Agent A:', message);
 
   receivedMessages.push({
