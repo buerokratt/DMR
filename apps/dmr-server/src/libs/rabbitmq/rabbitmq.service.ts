@@ -298,6 +298,9 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
             }
 
             if (errorTypes.includes(ValidationErrorType.DELIVERY_FAILED)) {
+              this.logger.debug(
+                `Message is requeued, reason: ${ValidationErrorType.DELIVERY_FAILED}`,
+              );
               return channel.nack(message, false, true);
             }
           }
