@@ -26,4 +26,4 @@ jobs:
         run: helm lint helm/dmr
 
       - name: Helm Dry Run Install
-        run: helm install dmr helm/dmr --values helm/dmr/values.yaml --dry-run --debug
+        run: helm template dmr helm/dmr --values helm/dmr/values.yaml --debug
