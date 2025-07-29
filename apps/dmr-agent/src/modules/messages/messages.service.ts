@@ -166,7 +166,7 @@ export class MessagesService implements OnModuleInit {
     ackCallback: ISocketAckCallback,
   ): Promise<void> {
     this.logger.debug(
-      ` Starting handleMessageFromDMRServerEvent with message: ${JSON.stringify(message, null, 2)}`,
+      `Starting handleMessageFromDMRServerEvent with message: ${JSON.stringify(message, null, 2)}`,
     );
 
     try {
@@ -186,8 +186,7 @@ export class MessagesService implements OnModuleInit {
         });
       }
 
-      this.logger.log(`Message decrypted successfully`);
-      this.logger.debug(` Decrypted message: ${JSON.stringify(decryptedMessage, null, 2)}`);
+      this.logger.debug(`Decrypted message: ${JSON.stringify(decryptedMessage, null, 2)}`);
 
       const outgoingMessage: DMRServerMessageDto = {
         id: message.id,
@@ -267,7 +266,7 @@ export class MessagesService implements OnModuleInit {
 
   async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
     this.logger.debug(
-      ` Starting sendEncryptedMessageToServer with message: ${JSON.stringify(message, null, 2)}`,
+      `Starting sendEncryptedMessageToServer with message: ${JSON.stringify(message, null, 2)}`,
     );
 
     const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
@@ -277,7 +276,6 @@ export class MessagesService implements OnModuleInit {
       throw new Error('Message not encrypted');
     }
 
-    this.logger.log(`Message encrypted successfully`);
     this.logger.debug(` Encrypted message: ${JSON.stringify(encryptedMessage, null, 2)}`);
 
     if (!this.websocketService.isConnected()) {
@@ -314,8 +312,10 @@ export class MessagesService implements OnModuleInit {
       const message =
         error instanceof Error ? error.message : 'Unexpected error sending message to DMR Server';
 
-      this.logger.error(`Error in sendEncryptedMessageToServer: ${message}`);
-      this.logger.error(` Error details: ${JSON.stringify(error, null, 2)}`);
+      this.logger.error(
+        `Error in sendEncryptedMessageToServer: ${message}`,
+        `Error details: ${JSON.stringify(error, null, 2)}`,
+      );
 
       if (error instanceof GatewayTimeoutException || error instanceof BadGatewayException) {
         throw error;
@@ -363,8 +363,10 @@ export class MessagesService implements OnModuleInit {
       return encryptedMessage;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.error(`Error encrypting message: ${errorMessage}`);
-      this.logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack'}`);
+      this.logger.error(
+        `Error encrypting message: ${errorMessage}`,
+        `Error stack: ${error instanceof Error ? error.stack : 'No stack'}`,
+      );
       return null;
     }
   }
@@ -372,7 +374,7 @@ export class MessagesService implements OnModuleInit {
   async decryptMessagePayloadFromDMRServer(
     message: AgentEncryptedMessageDto,
   ): Promise<AgentDecryptedMessageDto | null> {
-    this.logger.debug(`Starting encryption for message: ${JSON.stringify(message, null, 2)}`);
+    this.logger.debug(`Starting decryption for message: ${JSON.stringify(message, null, 2)}`);
 
     try {
       const sender = await this.getAgentById(message.senderId);
