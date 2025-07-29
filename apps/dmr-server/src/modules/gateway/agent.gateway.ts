@@ -351,7 +351,7 @@ export class AgentGateway
     if (serverWithSockets.sockets) {
       socket = serverWithSockets.sockets.get(socketId);
       if (socket) {
-        this.logger.debug(`Found socket through sockets map`, socket);
+        this.logger.debug(`Found socket through sockets map: ${socket.id}`);
       }
     }
 

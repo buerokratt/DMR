@@ -80,9 +80,13 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
         this.logger.log('Server disconnected client, attempting manual reconnection...');
 
         setTimeout(() => {
-          if (!this.socket?.connected) {
+          if (this.socket && !this.socket.connected) {
             this.logger.log('Attempting to reconnect after server disconnect...');
-            this.socket?.connect();
+            this.socket.auth = {
+              token: this.generateJwtToken(this.agentConfig.id, this.agentConfig.privateKey),
+            };
+
+            this.socket.connect();
           }
         }, this.webSocketConfig.reconnectionDelayMin);
       }
