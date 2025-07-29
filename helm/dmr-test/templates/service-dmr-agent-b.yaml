@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dmr-agent-b
+spec:
+  selector:
+    app: dmr-agent-b
+  ports:
+    - port: {{ .Values.dmrAgents.agentB.port }}
+      targetPort: {{ .Values.dmrAgents.agentB.port }}
+  type: ClusterIP

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: dmr
+description: A Helm chart for DMR project
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - dmr
+  - k8s
+  - microservice
+maintainers:
+  - name: https://github.com/varmoh
+sources:
+  - https://github.com/buerokratt/DMR

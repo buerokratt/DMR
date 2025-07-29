@@ -1,0 +1,42 @@
+dmrServer:
+  image: ghcr.io/varmoh/dmr:pre-alpha-test-1.1.2
+  port: 8075
+  mockPublicKeyA: |
+    -----BEGIN PUBLIC KEY-----
+
+    -----END PUBLIC KEY-----
+  mockPublicKeyB: |
+    -----BEGIN PUBLIC KEY-----
+
+    -----END PUBLIC KEY-----
+
+dmrAgents:
+  agentA:
+    image: ghcr.io/varmoh/dmr:pre-alpha-agent-1.1.2
+    id: 89b34e85-46af-4628-b193-7f6efadf0f26
+    port: 8076
+    privateKey: |
+      -----BEGIN PRIVATE KEY-----
+
+      -----END PRIVATE KEY-----
+  agentB:
+    image: ghcr.io/varmoh/dmr:pre-alpha-agent-1.1.2
+    id: 3d6f0a45-3a24-4e54-90e6-d701748f0851
+    port: 8077
+    privateKey: |
+      -----BEGIN PRIVATE KEY-----
+
+      -----END PRIVATE KEY-----
+
+shared:
+  environment: development
+  mockEnabled: "true"
+  outgoingEndpoint: http://test-server:8080
+
+rabbitmq:
+  image: rabbitmq:management
+  ports:
+    amqp: 30070
+    ui: 30071
+  user: user
+  pass: pass
