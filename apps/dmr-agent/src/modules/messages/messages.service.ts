@@ -165,6 +165,10 @@ export class MessagesService implements OnModuleInit {
     message: AgentEncryptedMessageDto,
     ackCallback: ISocketAckCallback,
   ): Promise<void> {
+    this.logger.debug(
+      ` Starting handleMessageFromDMRServerEvent with message: ${JSON.stringify(message, null, 2)}`,
+    );
+
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
@@ -182,6 +186,9 @@ export class MessagesService implements OnModuleInit {
         });
       }
 
+      this.logger.log(`Message decrypted successfully`);
+      this.logger.debug(` Decrypted message: ${JSON.stringify(decryptedMessage, null, 2)}`);
+
       const outgoingMessage: DMRServerMessageDto = {
         id: message.id,
         senderId: message.senderId,
@@ -191,6 +198,7 @@ export class MessagesService implements OnModuleInit {
         payload: decryptedMessage.payload as ChatMessagePayloadDto,
       };
 
+      this.logger.debug(`Sending message to External Service via HTTP`);
       const response = await this.handleOutgoingMessage(outgoingMessage);
 
       if (!response) {
@@ -208,8 +216,6 @@ export class MessagesService implements OnModuleInit {
       }
 
       this.logger.log(`Successfully processed and forwarded message ${message.id}`);
-
-      this.logger.log('Message is decrypted');
 
       return ackCallback({ status: SocketAckStatus.OK });
     } catch (error) {
@@ -366,6 +372,8 @@ export class MessagesService implements OnModuleInit {
   async decryptMessagePayloadFromDMRServer(
     message: AgentEncryptedMessageDto,
   ): Promise<AgentDecryptedMessageDto | null> {
+    this.logger.debug(`Starting encryption for message: ${JSON.stringify(message, null, 2)}`);
+
     try {
       const sender = await this.getAgentById(message.senderId);
 
@@ -374,11 +382,15 @@ export class MessagesService implements OnModuleInit {
         return null;
       }
 
+      this.logger.debug(`Found sender: ${JSON.stringify(sender, null, 2)}`);
+
       const decryptedPayload = await Utils.decryptPayload(
         message.payload,
         sender.authenticationCertificate,
         this.agentConfig.privateKey,
       );
+
+      this.logger.debug(`Payload decrypted successfully`);
 
       const decryptedMessage: AgentDecryptedMessageDto = {
         id: message.id,
@@ -388,6 +400,8 @@ export class MessagesService implements OnModuleInit {
         senderId: sender.id,
         timestamp: message.timestamp,
       };
+
+      this.logger.debug(`Created decrypted message: ${JSON.stringify(decryptedMessage, null, 2)}`);
 
       return decryptedMessage;
     } catch (error) {
