@@ -186,8 +186,6 @@ export class MessagesService implements OnModuleInit {
         });
       }
 
-      this.logger.debug(`Decrypted message: ${JSON.stringify(decryptedMessage, null, 2)}`);
-
       const outgoingMessage: DMRServerMessageDto = {
         id: message.id,
         senderId: message.senderId,
@@ -275,8 +273,6 @@ export class MessagesService implements OnModuleInit {
       this.logger.error('Message not encrypted');
       throw new Error('Message not encrypted');
     }
-
-    this.logger.debug(` Encrypted message: ${JSON.stringify(encryptedMessage, null, 2)}`);
 
     if (!this.websocketService.isConnected()) {
       this.logger.error('WebSocket service is not connected to DMR server.');
