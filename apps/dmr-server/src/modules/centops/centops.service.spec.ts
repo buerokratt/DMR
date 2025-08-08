@@ -91,7 +91,13 @@ describe('CentOpsService', () => {
     const response = await service.syncConfiguration();
 
     expect(response).toHaveLength(1);
-    expect(httpService.get).toHaveBeenCalledWith('http://test-url');
+    expect(httpService.get).toHaveBeenCalledWith(
+      'http://test-url',
+      expect.objectContaining({
+        params: { pageSize: expect.any(Number) },
+        headers: { Authorization: expect.any(String) },
+      }),
+    );
     expect(cacheManager.get).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION');
     expect(cacheManager.set).toHaveBeenCalledWith('CENT_OPS_CONFIGURATION', expect.any(Array));
     expect(eventEmitter.emit).toHaveBeenCalledWith(DmrServerEvent.UPDATED, expect.any(Object));
