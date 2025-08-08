@@ -100,10 +100,20 @@ export class CentOpsService implements OnModuleInit {
     return clientConfig;
   }
 
+  private getAuthorizationHeader() {
+    const token = `${this.centOpsConfig.apiKey}:${this.centOpsConfig.apiSecret}`;
+    const base64 = Buffer.from(token).toString('base64');
+
+    return base64;
+  }
+
   async syncConfiguration(): Promise<ClientConfigDto[] | undefined> {
     try {
       const { data } = await firstValueFrom(
-        this.httpService.get<IGetAgentConfigListResponse>(this.centOpsConfig.url),
+        this.httpService.get<IGetAgentConfigListResponse>(this.centOpsConfig.url, {
+          params: { pageSize: 100 },
+          headers: { Authorization: this.getAuthorizationHeader() },
+        }),
       );
 
       const configurations =
