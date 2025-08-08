@@ -121,13 +121,13 @@ export class CentOpsService implements OnModuleInit {
 
       const newConfigurations: ClientConfigDto[] = [];
 
-      for (const item of data.response) {
+      for (const item of data.response.items) {
         const clientConfig = plainToInstance(ClientConfigDto, {
-          id: item.id,
+          id: item.clientId,
           name: item.name,
-          authenticationCertificate: item.authentication_certificate.replace(/\\n/g, '\n'),
-          createdAt: item.created_at,
-          updatedAt: item.updated_at,
+          authenticationCertificate: item.authenticationCertificate.replace(/\\n/g, '\n'),
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
         });
 
         const errors = await validate(clientConfig);

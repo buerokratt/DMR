@@ -1,11 +1,16 @@
 export interface IGetAgentConfigListResponse {
-  response: IAgentConfig[];
+  response: {
+    items: IAgentConfig[];
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
 }
 
 export interface IAgentConfig {
-  id: string;
+  clientId: string;
   name: string;
-  authentication_certificate: string;
-  created_at: string;
-  updated_at: string;
+  authenticationCertificate: string;
+  createdAt: string;
+  updatedAt: string;
 }
