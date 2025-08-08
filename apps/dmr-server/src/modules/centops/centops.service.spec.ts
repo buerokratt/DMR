@@ -71,16 +71,21 @@ describe('CentOpsService', () => {
 
   it('should fetch and cache valid configuration', async () => {
     const mockData = {
-      response: [
-        {
-          id: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
-          name: 'Police',
-          authentication_certificate:
-            '-----BEGIN CERTIFICATE-----\nMIID...==\n-----END CERTIFICATE-----',
-          created_at: '2025-06-10T12:34:56Z',
-          updated_at: '2025-06-10T12:34:56Z',
-        },
-      ],
+      response: {
+        items: [
+          {
+            clientId: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
+            name: 'Police',
+            authenticationCertificate:
+              '-----BEGIN CERTIFICATE-----\nMIID...==\n-----END CERTIFICATE-----',
+            createdAt: '2025-06-10T12:34:56Z',
+            updatedAt: '2025-06-10T12:34:56Z',
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
+      },
     };
 
     vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
@@ -105,15 +110,20 @@ describe('CentOpsService', () => {
 
   it('should log error if validation fails', async () => {
     const mockData = {
-      response: [
-        {
-          id: 'cc5b7b04-ba33-4423-ba26-ccc25441db42',
-          name: '',
-          authentication_certificate: '',
-          created_at: 'invalid-date',
-          updated_at: 'invalid-date',
-        },
-      ],
+      response: {
+        items: [
+          {
+            clientId: 'cc5b7b04-ba33-4423-ba26-ccc25441db42',
+            name: '',
+            authenticationCertificate: '',
+            createdAt: 'invalid-date',
+            updatedAt: 'invalid-date',
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
+      },
     };
     vi.spyOn(httpService, 'get').mockReturnValueOnce(of({ data: mockData } as any));
     vi.spyOn(cacheManager, 'get').mockResolvedValue([]);
@@ -191,29 +201,34 @@ describe('CentOpsService', () => {
     ];
 
     const mockData = {
-      response: [
-        {
-          id: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
-          name: 'Police',
-          authentication_certificate: 'new-cert-1',
-          created_at: '2025-06-10T12:34:56Z',
-          updated_at: '2025-06-10T14:00:00Z',
-        },
-        {
-          id: 'a1e45678-12bc-4ef0-9876-def123456789',
-          name: 'Tax Office',
-          authentication_certificate: 'cert-2',
-          created_at: '2025-06-08T08:22:10Z',
-          updated_at: '2025-06-09T09:13:44Z',
-        },
-        {
-          id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-          name: 'Fire Department',
-          authentication_certificate: 'cert-3',
-          created_at: '2025-06-11T10:00:00Z',
-          updated_at: '2025-06-11T10:00:00Z',
-        },
-      ],
+      response: {
+        items: [
+          {
+            clientId: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
+            name: 'Police',
+            authenticationCertificate: 'new-cert-1',
+            createdAt: '2025-06-10T12:34:56Z',
+            updatedAt: '2025-06-10T14:00:00Z',
+          },
+          {
+            clientId: 'a1e45678-12bc-4ef0-9876-def123456789',
+            name: 'Tax Office',
+            authenticationCertificate: 'cert-2',
+            createdAt: '2025-06-08T08:22:10Z',
+            updatedAt: '2025-06-09T09:13:44Z',
+          },
+          {
+            clientId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+            name: 'Fire Department',
+            authenticationCertificate: 'cert-3',
+            createdAt: '2025-06-11T10:00:00Z',
+            updatedAt: '2025-06-11T10:00:00Z',
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
+      },
     };
 
     vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
@@ -269,22 +284,27 @@ describe('CentOpsService', () => {
     ];
 
     const mockData = {
-      response: [
-        {
-          id: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
-          name: 'Police',
-          authentication_certificate: 'new-cert-1',
-          created_at: '2025-06-10T12:34:56Z',
-          updated_at: '2025-06-10T14:00:00Z',
-        },
-        {
-          id: 'a1e45678-12bc-4ef0-9876-def123456789',
-          name: 'Tax Office',
-          authentication_certificate: 'new-cert-2',
-          created_at: '2025-06-08T08:22:10Z',
-          updated_at: '2025-06-09T11:00:00Z',
-        },
-      ],
+      response: {
+        items: [
+          {
+            clientId: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
+            name: 'Police',
+            authenticationCertificate: 'new-cert-1',
+            createdAt: '2025-06-10T12:34:56Z',
+            updatedAt: '2025-06-10T14:00:00Z',
+          },
+          {
+            clientId: 'a1e45678-12bc-4ef0-9876-def123456789',
+            name: 'Tax Office',
+            authenticationCertificate: 'new-cert-2',
+            createdAt: '2025-06-08T08:22:10Z',
+            updatedAt: '2025-06-09T11:00:00Z',
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
+      },
     };
 
     vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
@@ -326,15 +346,20 @@ describe('CentOpsService', () => {
     ];
 
     const mockData = {
-      response: [
-        {
-          id: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
-          name: 'Police',
-          authentication_certificate: 'cert-1',
-          created_at: '2025-06-10T12:34:56Z',
-          updated_at: '2025-06-10T14:00:00Z',
-        },
-      ],
+      response: {
+        items: [
+          {
+            clientId: 'd3b07384-d9a0-4c3f-a4e2-123456789abc',
+            name: 'Police',
+            authenticationCertificate: 'cert-1',
+            createdAt: '2025-06-10T12:34:56Z',
+            updatedAt: '2025-06-10T14:00:00Z',
+          },
+        ],
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
+      },
     };
 
     vi.spyOn(httpService, 'get').mockReturnValue(of({ data: mockData } as any));
