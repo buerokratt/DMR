@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dmr-agent-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dmr-agent-a
+  template:
+    metadata:
+      labels:
+        app: dmr-agent-a
+    spec:
+      containers:
+        - name: dmr-agent
+          image: {{ .Values.dmrAgents.agentA.image }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.dmrAgents.agentA.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.dmrAgents.agentA.port }}"
+            - name: ENVIRONMENT
+              value: "{{ .Values.shared.environment }}"
+            - name: LOGGER_COLORS
+              value: "true"
+            - name: LOGGER_LOG_LEVELS
+              value: "error,warn,log,verbose"
+            - name: DMR_SERVER_WEBSOCKET_URL
+              value: "http://dmr-server:{{ .Values.dmrServer.port }}"
+            - name: WEBSOCKET_RECONNECTION_DELAY
+              value: "1000"
+            - name: WEBSOCKET_RECONNECTION_DELAY_MAX
+              value: "5000"
+            - name: AGENT_PRIVATE_KEY
+              value: {{ .Values.dmrAgents.agentA.privateKey | quote }}
+            - name: AGENT_ID
+              value: {{ .Values.dmrAgents.agentA.id | quote }}
+            - name: OUTGOING_MESSAGE_ENDPOINT
+              value: {{ .Values.shared.outgoingEndpoint | quote }}
+            - name: MESSAGE_DELIVERY_TIMEOUT_MS
+              value: "2000"

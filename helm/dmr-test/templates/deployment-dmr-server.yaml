@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dmr-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dmr-server
+  template:
+    metadata:
+      labels:
+        app: dmr-server
+    spec:
+      containers:
+        - name: dmr-server
+          image: {{ .Values.dmrServer.image }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.dmrServer.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.dmrServer.port }}"
+            - name: ENVIRONMENT
+              value: "{{ .Values.shared.environment }}"
+            - name: LOGGER_COLORS
+              value: "true"
+            - name: LOGGER_LOG_LEVELS
+              value: "error,warn,log,debug"
+            - name: WEB_SOCKET_MAX_DISCONNECTION_DURATION
+              value: "120000"
+            - name: CENTOPS_CONFIGURATION_URL
+              value: "http://localhost:3000/centops/clients"
+            - name: CENTOPS_CONFIGURATION_CRON_TIME
+              value: "*/10 * * * * *"
+            - name: RABBITMQ_DEFAULT_PORT
+              value: "5672"
+            - name: RABBITMQ_DEFAULT_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_DEFAULT_TTL
+              value: "300000"
+            - name: RABBITMQ_DEFAULT_DLQ_TTL
+              value: "86400000"
+            - name: RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL
+              value: "5000"
+            - name: RABBITMQ_DEFAULT_USER
+              value: {{ .Values.rabbitmq.user | quote }}
+            - name: RABBITMQ_DEFAULT_PASS
+              value: {{ .Values.rabbitmq.pass | quote }}
+            - name: RABBITMQ_VALIDATION_FAILURES_TTL
+              value: "86400000"
+            - name: RABBITMQ_DEFAULT_MANAGEMENT_UI_URI
+              value: "http://rabbitmq:15672"
+            - name: MESSAGE_DELIVERY_TIMEOUT_MS
+              value: "2000"
+            - name: MSW_ENABLED
+              value: "{{ .Values.shared.mockEnabled }}"
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: "0"
+            - name: MOCK_DMR_AGENT_A_PUBLIC_KEY
+              value: {{ .Values.dmrServer.mockPublicKeyA | quote }}
+            - name: MOCK_DMR_AGENT_B_PUBLIC_KEY
+              value: {{ .Values.dmrServer.mockPublicKeyB | quote }}
+            - name: MOCK_DMR_AGENT_A_ID
+              value: {{ .Values.dmrAgents.agentA.id | quote }}
+            - name: MOCK_DMR_AGENT_B_ID
+              value: {{ .Values.dmrAgents.agentB.id | quote }}
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: {{ .Values.dmrServer.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5

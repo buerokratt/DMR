@@ -165,6 +165,10 @@ export class MessagesService implements OnModuleInit {
     message: AgentEncryptedMessageDto,
     ackCallback: ISocketAckCallback,
   ): Promise<void> {
+    this.logger.debug(
+      `Starting handleMessageFromDMRServerEvent with message: ${JSON.stringify(message, null, 2)}`,
+    );
+
     try {
       const decryptedMessage = await this.decryptMessagePayloadFromDMRServer(message);
 
@@ -191,6 +195,7 @@ export class MessagesService implements OnModuleInit {
         payload: decryptedMessage.payload as ChatMessagePayloadDto,
       };
 
+      this.logger.debug(`Sending message to External Service via HTTP`);
       const response = await this.handleOutgoingMessage(outgoingMessage);
 
       if (!response) {
@@ -208,8 +213,6 @@ export class MessagesService implements OnModuleInit {
       }
 
       this.logger.log(`Successfully processed and forwarded message ${message.id}`);
-
-      this.logger.log('Message is decrypted');
 
       return ackCallback({ status: SocketAckStatus.OK });
     } catch (error) {
@@ -261,7 +264,7 @@ export class MessagesService implements OnModuleInit {
 
   async sendEncryptedMessageToServer(message: ExternalServiceMessageDto): Promise<void> {
     this.logger.debug(
-      ` Starting sendEncryptedMessageToServer with message: ${JSON.stringify(message, null, 2)}`,
+      `Starting sendEncryptedMessageToServer with message: ${JSON.stringify(message, null, 2)}`,
     );
 
     const encryptedMessage = await this.encryptMessagePayloadFromExternalService(message);
@@ -270,9 +273,6 @@ export class MessagesService implements OnModuleInit {
       this.logger.error('Message not encrypted');
       throw new Error('Message not encrypted');
     }
-
-    this.logger.log(`Message encrypted successfully`);
-    this.logger.debug(` Encrypted message: ${JSON.stringify(encryptedMessage, null, 2)}`);
 
     if (!this.websocketService.isConnected()) {
       this.logger.error('WebSocket service is not connected to DMR server.');
@@ -308,8 +308,10 @@ export class MessagesService implements OnModuleInit {
       const message =
         error instanceof Error ? error.message : 'Unexpected error sending message to DMR Server';
 
-      this.logger.error(`Error in sendEncryptedMessageToServer: ${message}`);
-      this.logger.error(` Error details: ${JSON.stringify(error, null, 2)}`);
+      this.logger.error(
+        `Error in sendEncryptedMessageToServer: ${message}`,
+        `Error details: ${JSON.stringify(error, null, 2)}`,
+      );
 
       if (error instanceof GatewayTimeoutException || error instanceof BadGatewayException) {
         throw error;
@@ -357,8 +359,10 @@ export class MessagesService implements OnModuleInit {
       return encryptedMessage;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      this.logger.error(`Error encrypting message: ${errorMessage}`);
-      this.logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack'}`);
+      this.logger.error(
+        `Error encrypting message: ${errorMessage}`,
+        `Error stack: ${error instanceof Error ? error.stack : 'No stack'}`,
+      );
       return null;
     }
   }
@@ -366,6 +370,8 @@ export class MessagesService implements OnModuleInit {
   async decryptMessagePayloadFromDMRServer(
     message: AgentEncryptedMessageDto,
   ): Promise<AgentDecryptedMessageDto | null> {
+    this.logger.debug(`Starting decryption for message: ${JSON.stringify(message, null, 2)}`);
+
     try {
       const sender = await this.getAgentById(message.senderId);
 
@@ -374,11 +380,15 @@ export class MessagesService implements OnModuleInit {
         return null;
       }
 
+      this.logger.debug(`Found sender: ${JSON.stringify(sender, null, 2)}`);
+
       const decryptedPayload = await Utils.decryptPayload(
         message.payload,
         sender.authenticationCertificate,
         this.agentConfig.privateKey,
       );
+
+      this.logger.debug(`Payload decrypted successfully`);
 
       const decryptedMessage: AgentDecryptedMessageDto = {
         id: message.id,
@@ -388,6 +398,8 @@ export class MessagesService implements OnModuleInit {
         senderId: sender.id,
         timestamp: message.timestamp,
       };
+
+      this.logger.debug(`Created decrypted message: ${JSON.stringify(decryptedMessage, null, 2)}`);
 
       return decryptedMessage;
     } catch (error) {
