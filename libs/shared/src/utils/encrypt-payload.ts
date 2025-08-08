@@ -1,4 +1,5 @@
-import { CompactEncrypt, importPKCS8, importSPKI, SignJWT } from 'jose';
+import { CompactEncrypt, importSPKI, SignJWT } from 'jose';
+import { importPrivateKey } from './key-utilities';
 
 const encoder = new TextEncoder();
 
@@ -8,7 +9,7 @@ export const encryptPayload = async (
   recipientPublicKeyString: string,
 ): Promise<string> => {
   // Load agent's private key (for signing)
-  const senderPrivateKey = await importPKCS8(senderPrivateKeyString, 'RS256');
+  const senderPrivateKey = await importPrivateKey(senderPrivateKeyString, 'RS256');
 
   // Sign the payload
   const jwt = await new SignJWT({ data: payload })

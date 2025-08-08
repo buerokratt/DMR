@@ -1,4 +1,5 @@
-import { compactDecrypt, importPKCS8, importSPKI, jwtVerify } from 'jose';
+import { compactDecrypt, importSPKI, jwtVerify } from 'jose';
+import { importPrivateKey } from './key-utilities';
 
 const decoder = new TextDecoder();
 
@@ -8,7 +9,7 @@ export const decryptPayload = async (
   recipientPrivateKeyString: string,
 ): Promise<{ data: unknown }> => {
   // Load recipient's private key (for encryption)
-  const recipientPrivateKey = await importPKCS8(recipientPrivateKeyString, 'RSA-OAEP');
+  const recipientPrivateKey = await importPrivateKey(recipientPrivateKeyString, 'RSA-OAEP');
 
   // Decrypt the JWE
   const { plaintext } = await compactDecrypt(jwe, recipientPrivateKey);
