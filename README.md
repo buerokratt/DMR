@@ -128,8 +128,7 @@ docker compose up -d
 You can test the whole flow of the solution this way:
 
 1. Run `docker compose up -d`.
-2. Run `node scripts/test-server.js`. This starts a simple server to read messages coming to `OUTGOING_MESSAGE_ENDPOINT`. It emulates an external service in Agent A cluster.
-3. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
+2. Run this command to send a message in [the proper format](#sending-messages) through `dmr-agent-b`:
 
 ```bash
 curl -X POST http://localhost:8074/v1/messages \
@@ -157,7 +156,7 @@ curl -X POST http://localhost:8074/v1/messages \
   }'
 ```
 
-`dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You will see the message sent to the test server.
+`dmr-agent-b` will forward this message to `dmr-server`. `dmr-server` will add it to the queue for `dmr-agent-a`. `dmr-agent-a` will receive it from `dmr-server` and forward it to the `OUTGOING_MESSAGE_ENDPOINT`. You will see the message in the logs of the `outgoing-endpoint-mock` container.
 
 ## Environment Variables
 

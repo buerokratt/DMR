@@ -124,6 +124,17 @@ services:
     networks:
       - bykstack
 
+  outgoing-endpoint-mock:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile
+    container_name: outgoing-endpoint-mock
+    restart: always
+    ports:
+      - '8080:8080'
+    networks:
+      - bykstack
+
 configs:
   rabbitmq-plugins:
     content: '[rabbitmq_management].'
