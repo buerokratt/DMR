@@ -2,7 +2,7 @@ FROM node:24
 
 WORKDIR /app
 
-COPY outgoing-endpoint-mock/server.js .
+COPY server.js .
 
 EXPOSE 8099
 

@@ -134,8 +134,8 @@ services:
 
   outgoing-endpoint-mock:
     build:
-      context: .
-      dockerfile: outgoing-endpoint-mock/Dockerfile
+      context: ./outgoing-endpoint-mock
+      dockerfile: Dockerfile
     container_name: outgoing-endpoint-mock
     restart: always
     ports:
