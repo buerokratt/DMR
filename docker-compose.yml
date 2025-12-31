@@ -4,8 +4,8 @@ services:
     container_name: dmr-rabbitmq
     restart: always
     ports:
-      - "8070:5672" # AMQP port
-      - "8071:15672" # Management UI
+      - '8070:5672' # AMQP port
+      - '8071:15672' # Management UI
     environment:
       - RABBITMQ_DEFAULT_USER=user
       - RABBITMQ_DEFAULT_PASS=pass
@@ -18,7 +18,7 @@ services:
     networks:
       - bykstack
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,7 +31,7 @@ services:
     container_name: dmr-server
     restart: always
     ports:
-      - "8072:8075"
+      - '8072:8075'
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -66,15 +66,7 @@ services:
     networks:
       - bykstack
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "-O",
-          "/dev/null",
-          "-q",
-          "http://localhost:8075/v1/health",
-        ]
+      test: ['CMD', 'wget', '-O', '/dev/null', '-q', 'http://localhost:8075/v1/health']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -87,7 +79,7 @@ services:
     container_name: dmr-agent-a
     restart: always
     ports:
-      - "8073:8077" # Agent 1 port
+      - '8073:8077' # Agent 1 port
     depends_on:
       dmr-server:
         condition: service_healthy
@@ -113,7 +105,7 @@ services:
     container_name: dmr-agent-b
     restart: always
     ports:
-      - "8074:8077" # Agent 2 port
+      - '8074:8077' # Agent 2 port
     depends_on:
       dmr-server:
         condition: service_healthy
@@ -139,13 +131,13 @@ services:
     container_name: outgoing-endpoint-mock
     restart: always
     ports:
-      - "8099:8099"
+      - '8099:8099'
     networks:
       - bykstack
 
 configs:
   rabbitmq-plugins:
-    content: "[rabbitmq_management]."
+    content: '[rabbitmq_management].'
 
 volumes:
   rabbitmq_lib:
