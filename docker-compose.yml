@@ -126,7 +126,7 @@ services:
 
   outgoing-endpoint-mock:
     build:
-      context: ./outgoing-endpoint-mock
+      context: ./scripts
       dockerfile: Dockerfile
     container_name: outgoing-endpoint-mock
     restart: always

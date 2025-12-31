@@ -2,7 +2,7 @@ FROM node:24
 
 WORKDIR /app
 
-COPY server.js .
+COPY test-server.js .
 
 EXPOSE 8080
 
