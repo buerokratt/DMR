@@ -122,7 +122,7 @@ export default [
       '**/apps/**/eslint.config.mjs',
       '**/libs/**/eslint.config.mjs',
       '**/*.spec.ts',
-      '**/scripts/test-server.js',
+      '**/outgoing-endpoint-mock/**/*.js',
     ],
   },
   eslint.configs.recommended,

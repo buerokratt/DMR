@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY server.js .
 
-EXPOSE 8099
+EXPOSE 8080
 
 CMD ["node", "test-server.js"]
 

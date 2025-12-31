@@ -3,5 +3,6 @@
 /coverage
 /.nx/cache
 /.nx/workspace-data
+/scripts/test-server.js
 /pnpm-lock.yaml
 /helm/

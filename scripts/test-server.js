@@ -1,3 +1,6 @@
+// Note: the folder and file names are for backwards compatibility with Helm.
+// In the future, should probably be 'outgoing-endpoint-mock/server.js'.
+// Possibly also port.
 const http = require('node:http');
 
 const server = http.createServer((req, res) => {
@@ -15,6 +18,6 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(8099, () => {
-  console.log('Listening on port 8099...');
+server.listen(8080, () => {
+  console.log('Listening on port 8080...');
 });
