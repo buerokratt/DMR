@@ -1,13 +1,13 @@
-import nx from '@nx/eslint-plugin';
 import eslint from '@eslint/js';
+import nx from '@nx/eslint-plugin';
 import vitest from '@vitest/eslint-plugin';
+import * as importPlugin from 'eslint-plugin-import';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import sonarjs from 'eslint-plugin-sonarjs';
+import unicorn from 'eslint-plugin-unicorn';
 import unusedImports from 'eslint-plugin-unused-imports';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import * as importPlugin from 'eslint-plugin-import';
-import sonarjs from 'eslint-plugin-sonarjs';
-import unicorn from 'eslint-plugin-unicorn';
 
 export default [
   ...nx.configs['flat/base'],
@@ -122,7 +122,7 @@ export default [
       '**/apps/**/eslint.config.mjs',
       '**/libs/**/eslint.config.mjs',
       '**/*.spec.ts',
-      '**/outgoing-endpoint-mock/**/*.js',
+      '**/scripts/test-server.js',
     ],
   },
   eslint.configs.recommended,
