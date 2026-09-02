@@ -63,12 +63,19 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async connect(): Promise<void> {
-    this._connection = await rabbit.connect({
-      port: this.rabbitMQConfig.port,
-      hostname: this.rabbitMQConfig.hostname,
-      username: this.rabbitMQConfig.username,
-      password: this.rabbitMQConfig.password,
-    });
+    if (this.rabbitMQConfig.endpoint) {
+      const endpoint = new URL(this.rabbitMQConfig.endpoint);
+      endpoint.username = this.rabbitMQConfig.username;
+      endpoint.password = this.rabbitMQConfig.password;
+      this._connection = await rabbit.connect(endpoint.toString());
+    } else {
+      this._connection = await rabbit.connect({
+        port: this.rabbitMQConfig.port,
+        hostname: this.rabbitMQConfig.hostname,
+        username: this.rabbitMQConfig.username,
+        password: this.rabbitMQConfig.password,
+      });
+    }
 
     this._connection.on('close', () => this.onClose());
     this._connection.on('error', (error: Error) => {

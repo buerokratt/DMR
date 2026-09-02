@@ -64,6 +64,7 @@ import * as amqplib from 'amqplib';
 import { of, throwError } from 'rxjs';
 import { AgentGateway } from '../../modules/gateway'; // Import AgentGateway
 const {
+  connectMock,
   assertQueueMock,
   deleteQueueMock,
   checkQueueMock,
@@ -145,6 +146,19 @@ describe('RabbitMQService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('should connect to an AMQPS endpoint with credentials', async () => {
+    connectMock.mockClear();
+    (service as any).rabbitMQConfig.endpoint = 'amqps://broker.mq.eu-north-1.amazonaws.com:5671';
+    (service as any).rabbitMQConfig.username = 'mqadmin';
+    (service as any).rabbitMQConfig.password = 'secret/password';
+
+    await (service as any).connect();
+
+    expect(connectMock).toHaveBeenCalledWith(
+      'amqps://mqadmin:secret%2Fpassword@broker.mq.eu-north-1.amazonaws.com:5671',
+    );
   });
 
   it('should call scheduleReconnect on failed connect', async () => {

@@ -173,8 +173,9 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `WEB_SOCKET_MAX_DISCONNECTION_DURATION`       | Maximum duration (ms) for DMR Agent WebSocket disconnection. Used by [connection state recovery](https://socket.io/docs/v4/server-options/#connectionstaterecovery). |          | `120000` (2 minutes)  |
 | `CENTOPS_CONFIGURATION_URL`                   | URL for CentOps configuration service. **Can be set to any value when using [CentOps configuration endpoint mock](#centops-mock).**                                  | Yes      |                       |
 | `CENTOPS_CONFIGURATION_CRON_TIME`             | Cron schedule for fetching configuration (agent list) from CentOps                                                                                                   |          | `*/30 * * * *`        |
-| `RABBITMQ_DEFAULT_HOST`                       | Hostname for RabbitMQ connection                                                                                                                                     | Yes      |                       |
-| `RABBITMQ_DEFAULT_PORT`                       | Port for RabbitMQ AMQP connection                                                                                                                                    | Yes      |                       |
+| `RABBITMQ_DEFAULT_HOST`                       | Hostname for RabbitMQ connection                                                                                                                                     | Yes¹     |                       |
+| `RABBITMQ_DEFAULT_PORT`                       | Port for RabbitMQ AMQP connection                                                                                                                                    | Yes¹     |                       |
+| `RABBITMQ_DEFAULT_ENDPOINT`                   | Full `amqp://` or `amqps://` endpoint; takes precedence over host and port                                                                                           | No       |                       |
 | `RABBITMQ_DEFAULT_MANAGEMENT_UI_URI`          | URI for RabbitMQ management interface                                                                                                                                | Yes      |                       |
 | `RABBITMQ_DEFAULT_USER`                       | Username for RabbitMQ authentication                                                                                                                                 | Yes      |                       |
 | `RABBITMQ_DEFAULT_PASS`                       | Password for RabbitMQ authentication                                                                                                                                 | Yes      |                       |
@@ -183,6 +184,8 @@ Below is a list of all environment variables used by the DMR system, organized b
 | `RABBITMQ_VALIDATION_FAILURES_TTL`            | TTL (ms) for messages in validation failures queue                                                                                                                   |          | `86400000` (24 hours) |
 | `RABBITMQ_DEFAULT_DEFAULT_RECONNECT_INTERVAL` | Interval (ms) for reconnection attempts from DMR Server to RabbitMQ                                                                                                  |          | `5000` (5 seconds)    |
 | `MESSAGE_DELIVERY_TIMEOUT_MS`                 | Timeout (ms) for forwarding outgoing messages to DMR Agent.                                                                                                          |          | `2000`                |
+
+¹ Host and port are required unless `RABBITMQ_DEFAULT_ENDPOINT` is set.
 
 #### CentOps mock
 
