@@ -231,7 +231,7 @@ Messages endpoint supports versioning. The `v1` version message JSON structure i
   "id": "b1a7e8c2-1234-4f56-9abc-1234567890ab",
   "recipientId": "d3b07384-d9a0-4c3f-a4e2-123456789abc",
   "timestamp": "2024-01-15T10:30:00.000Z",
-  "type": "ChatMessage", // For now, only ChatMessage is supported
+  "type": "ChatMessage", // Available Types: ChatMessage, ChatHandover, ChatClassification
   "payload": {
     "chat": {
       "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
